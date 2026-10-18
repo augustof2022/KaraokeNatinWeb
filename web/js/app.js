@@ -162,27 +162,32 @@
     app.state.hostName = app.name;
     app.cohosts = {};
     app.approved = app.approved || {};
+    var room = app.state;
+    function currentRoom() { return app.role === "host" && app.state === room; }
 
     app.net = KN.net.host(code, {
       token: app.hostToken,
       on: {
         "guest-open": function (link) {
+          if (!currentRoom()) return;
           app.guestNames[link.id] = app.guestNames[link.id] || "Guest";
           link.send({ type: MSG.WELCOME, clientId: link.id, code: code });
           refreshGuestList();
           sendStateTo(link);
           render();
         },
-        "guest-message": function (link, data) { onGuestCommand(link, data); },
+        "guest-message": function (link, data) { if (currentRoom()) onGuestCommand(link, data); },
         "guest-close": function (link) {
+          if (!currentRoom()) return;
           delete app.guestNames[link.id];
           refreshGuestList();
           // Who's in the room isn't something a guest's queue/playback
           // request could go stale against — don't bump rev over it.
           broadcastState({ progress: true });
         },
-        broker: function () { render(); },
+        broker: function () { if (currentRoom()) render(); },
         wake: function () {
+          if (!currentRoom()) return;
           // Back from sleep: the guest list has just been re-proved, and any
           // guest that stayed is holding a snapshot from before the nap.
           refreshGuestList();
@@ -190,6 +195,7 @@
           render();
         },
         "code-taken": function () {
+          if (!currentRoom()) return;
           // Every broker says the id is in use, so someone else really is on
           // this code. Move rather than fight over it — but keep the queue.
           toast("That room code was taken — switching to a new one.", "warn");
@@ -214,7 +220,19 @@
     checkCurfew();
   }
 
+  var playerGeneration = 0;
+
+  function destroyPlayer(player) {
+    try { player.destroy(); }
+    catch (err) { console.warn("[kn] player cleanup failed", err); }
+  }
+
   function setupPlayer() {
+    var generation = ++playerGeneration;
+    var room = app.state;
+    function currentPlayer() {
+      return generation === playerGeneration && app.role === "host" && app.state === room;
+    }
     var mount = $("#yt-mount");
     // The API replaces its target element with the iframe, so give it a fresh
     // placeholder — but leave the overlay button in the mount alone.
@@ -226,15 +244,17 @@
     mount.insertBefore(el("div", { id: "yt-frame" }), mount.firstChild);
 
     KN.player
-      .create("yt-frame")
+      .create("yt-frame", currentPlayer)
       .then(function (p) {
+        if (!currentPlayer()) { if (p) destroyPlayer(p); return; }
         app.player = p;
         p.volume(app.state.player.volume);
         p.mute(app.state.player.muted);
 
-        p.on("ended", function () { songFinished(); });
-        p.on("blocked", function () { $("#tap-to-play").hidden = false; });
+        p.on("ended", function () { if (currentPlayer()) songFinished(); });
+        p.on("blocked", function () { if (currentPlayer()) $("#tap-to-play").hidden = false; });
         p.on("playing", function () {
+          if (!currentPlayer()) return;
           $("#tap-to-play").hidden = true;
           app.state.player.status = "playing";
           var m = p.meta();
@@ -245,11 +265,12 @@
           }
           broadcastState();
         });
-        p.on("paused", function () { app.state.player.status = "paused"; broadcastState(); });
-        p.on("buffering", function () { app.state.player.status = "loading"; broadcastState(); });
+        p.on("paused", function () { if (currentPlayer()) { app.state.player.status = "paused"; broadcastState(); } });
+        p.on("buffering", function () { if (currentPlayer()) { app.state.player.status = "loading"; broadcastState(); } });
         p.on("error", function (msg) {
+          if (!currentPlayer()) return;
           notice(msg + " Skipping.", "warn");
-          setTimeout(nextSong, 1200);
+          setTimeout(function () { if (currentPlayer()) nextSong(); }, 1200);
         });
 
         // Resume whatever was loaded before a refresh.
@@ -259,6 +280,7 @@
         startTicker();
       })
       .catch(function (err) {
+        if (!currentPlayer()) return;
         /* A stage that cannot play anything has nothing to say about an empty
          * queue: the error is the only thing worth reading, and worth being
          * able to press. */
@@ -1454,13 +1476,17 @@
 
   function leave() {
     var net = app.net;
-    if (app.role === "host" && net) {
-      net.broadcast({ type: MSG.BYE, reason: "closed" });
+    playerGeneration++;
+    closeLeaveConfirmation(false);
+    if (app.role === "host") {
       forget(STORE.host);
-      // Give the goodbye a moment to leave the wire before tearing it down.
-      setTimeout(function () { net.stop(); }, 200);
+      if (net) {
+        net.broadcast({ type: MSG.BYE, reason: "closed" });
+        // Give the goodbye a moment to leave the wire before tearing it down.
+        setTimeout(function () { net.stop(); }, 200);
+      }
     } else if (net) net.stop();
-    if (app.player) app.player.destroy();
+    if (app.player) destroyPlayer(app.player);
     clearInterval(ticker);
     clearTimeout(scoreTimer);
     clearSpinOffer();
@@ -1481,6 +1507,28 @@
     document.body.classList.remove("can-manage");
     location.hash = "#/";
     showHome();
+    $("#host-btn").focus();
+  }
+
+  function closeLeaveConfirmation(restoreFocus) {
+    $("#leave-room-confirm").hidden = true;
+    if (restoreFocus !== false) $("#leave-btn").focus();
+  }
+
+  function setupLeaveConfirmation() {
+    var confirmation = $("#leave-room-confirm");
+    var cancel = $("#leave-room-cancel");
+    var close = $("#leave-room-close");
+    cancel.addEventListener("click", function () { closeLeaveConfirmation(); });
+    close.addEventListener("click", function () { leave(); });
+    confirmation.addEventListener("click", function (e) {
+      if (e.target === confirmation) closeLeaveConfirmation();
+    });
+    confirmation.addEventListener("keydown", function (e) {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey && document.activeElement === cancel) { e.preventDefault(); close.focus(); }
+      else if (!e.shiftKey && document.activeElement === close) { e.preventDefault(); cancel.focus(); }
+    });
   }
 
   /* ---------------- screen: home ---------------- */
@@ -3219,7 +3267,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.2";
+  var APP_VERSION = "2.6.3";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;
@@ -3543,7 +3591,11 @@
 
     // room chrome
     $("#leave-btn").addEventListener("click", function () {
-      if (app.role === "host" && !confirm("Close the room? Guests will be disconnected.")) return;
+      if (app.role === "host") {
+        $("#leave-room-confirm").hidden = false;
+        $("#leave-room-cancel").focus();
+        return;
+      }
       leave();
     });
     $("#retry-btn").addEventListener("click", function () { if (app.net) app.net.retryNow(); });
@@ -3780,6 +3832,7 @@
 
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;
+      if (!$("#leave-room-confirm").hidden) { e.preventDefault(); closeLeaveConfirmation(); return; }
       if (!$("#picker").hidden) closePicker();
       else if (!$("#roulette-modal").hidden) closeRoulette();
       else if (!$("#dupes").hidden) { $("#dupes").hidden = true; pendingImport = null; }
@@ -3822,6 +3875,7 @@
     if (KN.sound) KN.sound.arm();
     setupTheme();
     setupNameGate();
+    setupLeaveConfirmation();
     setupYouTubeAccount();
     setupUpdateUI();
     switchTab("queue");

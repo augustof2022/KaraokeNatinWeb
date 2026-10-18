@@ -31,7 +31,7 @@
       } catch (e) { /* private mode — fall back to the system preference */ }
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=2.6.2" />
+  <link rel="stylesheet" href="css/app.css?v=2.6.3" />
 </head>
 
 <body>
@@ -209,6 +209,19 @@
       <button id="stats-clear" class="btn btn-quiet btn-sm">Erase my statistics</button>
     </div>
   </section>
+
+  <div id="leave-room-confirm" class="modal-backdrop" hidden>
+    <div class="modal modal-sm" role="dialog" aria-modal="true"
+         aria-labelledby="leave-room-title" aria-describedby="leave-room-description">
+      <h2 id="leave-room-title">Close this room?</h2>
+      <p id="leave-room-description">Everyone will be disconnected and playback will stop.
+        You can start a new room whenever you’re ready.</p>
+      <div class="leave-room-actions">
+        <button type="button" id="leave-room-cancel" class="btn btn-ghost">Keep room open</button>
+        <button type="button" id="leave-room-close" class="btn btn-primary">Close room</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Search block, moved between the room's Search tab and the library view. -->
   <div id="search-root" class="search-root" hidden>
@@ -784,18 +797,18 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script src="js/icons.js?v=2.6.2"></script>
-  <script src="js/sound.js?v=2.6.2"></script>
-  <script src="js/fx.js?v=2.6.2"></script>
-  <script src="js/stats.js?v=2.6.2"></script>
-  <script src="js/games.js?v=2.6.2"></script>
-  <script src="js/qr.js?v=2.6.2"></script>
-  <script src="js/peer.js?v=2.6.2"></script>
-  <script src="js/search.js?v=2.6.2"></script>
-  <script src="js/library.js?v=2.6.2"></script>
-  <script src="js/room.js?v=2.6.2"></script>
-  <script src="js/player.js?v=2.6.2"></script>
-  <script src="js/embed.js?v=2.6.2"></script>
-  <script src="js/app.js?v=2.6.2"></script>
+  <script src="js/icons.js?v=2.6.3"></script>
+  <script src="js/sound.js?v=2.6.3"></script>
+  <script src="js/fx.js?v=2.6.3"></script>
+  <script src="js/stats.js?v=2.6.3"></script>
+  <script src="js/games.js?v=2.6.3"></script>
+  <script src="js/qr.js?v=2.6.3"></script>
+  <script src="js/peer.js?v=2.6.3"></script>
+  <script src="js/search.js?v=2.6.3"></script>
+  <script src="js/library.js?v=2.6.3"></script>
+  <script src="js/room.js?v=2.6.3"></script>
+  <script src="js/player.js?v=2.6.3"></script>
+  <script src="js/embed.js?v=2.6.3"></script>
+  <script src="js/app.js?v=2.6.3"></script>
 </body>
 </html>

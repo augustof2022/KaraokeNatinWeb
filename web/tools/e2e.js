@@ -254,6 +254,20 @@ async function main() {
   await host.waitForFunction(() => document.querySelectorAll("#queue .row").length === 1, null, { timeout: 15000 });
   check("host restores its queue across a reload", true);
 
+  // Closing a room must also take connected guests home, rather than leave
+  // them retrying a room that no longer exists.
+  await guest.waitForSelector("#conn.conn-ok", { timeout: 60000 });
+  await host.waitForFunction(() => document.querySelector("#guest-count").textContent === "1", null, { timeout: 30000 });
+  await host.click("#leave-btn");
+  await host.waitForSelector("#leave-room-confirm:not([hidden])");
+  await host.click("#leave-room-close");
+  await host.waitForSelector("#view-home:not([hidden])");
+  await guest.waitForSelector("#view-home:not([hidden])", { timeout: 15000 });
+  check("closing the host room returns its connected guest home", await guest.evaluate(() =>
+    window.KN.app.role === null && window.KN.app.net === null && location.hash === "#/"));
+  check("host close clears the guest's saved room", await guest.evaluate(() => localStorage.getItem("kn:guest") === null));
+  check("host close tells the guest why it left", await guest.locator("#toasts").innerText().then((text) => /host closed the room/i.test(text)));
+
   await browser.close();
   site.close();
   process.exit(failures ? 1 : 0);

@@ -16,6 +16,13 @@ Upstream source and revision: [UPSTREAM.md](UPSTREAM.md).
 
 ---
 
+## Leaving a room
+
+On the host screen, **Leave** opens a confirmation inside the app. Choose
+**Keep room open** to cancel or **Close room** to stop playback, disconnect guests,
+and return home. This also works when the browser suppresses its own popups.
+Guests can use **Leave** to return home without closing the host’s room.
+
 ## How it connects without a backend
 
 Two browsers can talk directly over a WebRTC data channel, but they cannot *find* each other
@@ -493,6 +500,7 @@ Individual checks below run from `web/` after installing the test runner:
 
 ```bash
 node tools/qr-test.js         # QR conformance: module counts, block layouts, capacities
+node tools/leave-room-e2e.js  # app confirmation, room teardown, delayed player setup
 node tools/youtube-setup-e2e.js # optional account guidance, safe popup, skip, room restore
 node tools/e2e.js             # two real browsers, one real WebRTC link (needs playwright)
 node tools/reconnect-e2e.js   # leaving the browser and coming back           (playwright)

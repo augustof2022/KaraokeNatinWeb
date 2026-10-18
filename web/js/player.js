@@ -115,13 +115,14 @@
   }
 
   /**
-   * create(elementId) -> Promise<player>
+   * create(elementId, isCurrent?) -> Promise<player|null>
+   * isCurrent can cancel a setup while the API loads, before it touches the DOM.
    *
    * player: load(id) play() pause() seek(t) volume(v) mute(on)
    *         time() duration() destroy()
    * events: 'ready' 'playing' 'paused' 'ended' 'buffering' 'error' 'meta' 'blocked'
    */
-  function create(elementId) {
+  function create(elementId, isCurrent) {
     var self = {};
     var listeners = {};
     var yt = null;
@@ -202,6 +203,8 @@
     };
 
     return loadApi().then(function (YT) {
+      // A closed room may have replaced this element while the API was loading.
+      if (isCurrent && !isCurrent()) return null;
       return new Promise(function (resolve) {
         yt = new YT.Player(elementId, {
           height: "100%",

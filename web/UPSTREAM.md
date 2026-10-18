@@ -18,6 +18,7 @@ Fork changes:
 - Link the app's source footer and documentation to this fork.
 - Use a relative PWA manifest identity so installation uses this site's path.
 - Add optional host YouTube sign-in guidance without changing account or playback handling.
+- Confirm room closure inside the app and ignore stale player/network callbacks after leaving.
 - Publish only static runtime assets through `.github/workflows/pages.yml`.
 
 The upstream browser code and the native app have separate implementations.
