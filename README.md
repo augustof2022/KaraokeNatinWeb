@@ -1,4 +1,11 @@
-# 🎤 KaraokeNatin
+# 🎤 KaraokeNatinWeb
+
+This is [augustof2022/KaraokeNatinWeb](https://github.com/augustof2022/KaraokeNatinWeb), a fork of
+[nojukuramu/KaraokeNatin](https://github.com/nojukuramu/KaraokeNatin), with a standalone browser app for GitHub Pages.
+
+**Website URL after deployment:** https://augustof2022.github.io/KaraokeNatinWeb/
+
+See [Publish your website](#publish-your-website) below to enable the first deployment.
 
 **Turn any TV, projector, or Android device into a karaoke system with your phone as the remote control!**
 
@@ -31,7 +38,10 @@ KaraokeNatin is a local-network karaoke application that lets you enjoy karaoke 
 ## 📦 Downloads
 
 ### Pre-built Releases
-Check the [Releases](https://github.com/nojukuramu/KaraokeNatin/releases) page for:
+Desktop and Android downloads from the original project are available on the
+[upstream Releases page](https://github.com/nojukuramu/KaraokeNatin/releases).
+Releases built specifically for this fork will appear on [this fork’s Releases page](https://github.com/augustof2022/KaraokeNatinWeb/releases).
+The upstream project provides:
 - **Windows** — `.exe` (NSIS) or `.msi` installer
 - **Linux** — `.deb` or `.AppImage`
 - **Android** — `.apk` for phones, tablets, and Android TV (arm64)
@@ -40,17 +50,44 @@ Check the [Releases](https://github.com/nojukuramu/KaraokeNatin/releases) page f
 ### Build from Source
 See [Building](#-building-from-source) below.
 
-### 🌐 Nothing to install: the web version
-There is a stripped-down browser port at **https://nojukuramu.github.io/karaokenatin/** — open it
-on the TV's browser, let everyone scan the QR code, and their phones become remotes. It keeps the
-embedded player, search, queue, QR sharing and the remote, and drops the desktop-only parts
-(playlist library, scoring, mic coverage).
+### 🌐 Nothing to install: this fork’s website
 
-The two differ where they have to. This app runs its own signalling and serves the guest UI over
-your LAN; a static site cannot, so the web version pairs peers through a public PeerJS broker and
-searches YouTube through public Piped/Invidious mirrors. Source lives in
-[`karaokenatin/`](https://github.com/nojukuramu/nojukuramu.github.io/tree/main/karaokenatin) in
-the site repo.
+The browser app lives in [`web/`](web/) and deploys to:
+
+**https://augustof2022.github.io/KaraokeNatinWeb/**
+
+That URL becomes available after a successful GitHub Pages deployment; forking alone does not publish it.
+Open it on the host screen, start a room, and let guests scan the QR code with their phones.
+Keep the host tab open throughout the session. Share links and QR codes use the current site address,
+so guests join your copy of the app.
+
+The browser app uses public PeerJS brokers for connection setup and Piped/Invidious mirrors for search.
+It includes the YouTube player, queue, phone remotes, local playlists, games, and session scores.
+Scores are entertainment features rather than microphone-based vocal analysis. Internet access is required
+for playback and these public services; their availability is outside this fork’s control.
+
+The browser source comes from [nojukuramu’s web version](https://github.com/nojukuramu/nojukuramu.github.io/tree/main/karaokenatin).
+See [`web/UPSTREAM.md`](web/UPSTREAM.md) for the imported revision and fork changes.
+The original public site remains at https://nojukuramu.github.io/karaokenatin/.
+
+## Publish your website
+
+1. Push this repository, including `web/` and `.github/workflows/pages.yml`, to the fork’s `main` branch.
+2. In this fork’s **Settings → Pages → Build and deployment**, choose **GitHub Actions** as the source.
+3. In **Actions**, enable workflows if GitHub has disabled them for the fork, then run **Deploy website to GitHub Pages**.
+4. Wait for the deployment job to succeed, then open https://augustof2022.github.io/KaraokeNatinWeb/.
+
+Later pushes affecting `web/` automatically redeploy the site. The workflow publishes only the browser
+app’s static files; Rust, Android SDKs, desktop installers, and application secrets are not needed.
+
+For local website development:
+
+```bash
+python3 -m http.server 8080 --directory web
+```
+
+Open the local server in your browser. The native Tauri frontend in `apps/host/` needs its Rust backend;
+`web/` is the standalone application used for GitHub Pages. Website checks and details are in [`web/README.md`](web/README.md).
 
 ## 🚀 Getting Started
 
@@ -139,6 +176,7 @@ KaraokeNatin/
 │           │   ├── signaling.rs   # room/join handling
 │           │   └── peer_server.rs # PeerJS broker (keeps WebRTC on the LAN)
 │           └── remote-ui/     # guest UI, compiled into the binary
+├── web/                        # Standalone browser app published to GitHub Pages
 ├── packages/
 │   └── shared/                # Shared TypeScript types & protocols
 ├── build.sh / build.bat       # Build scripts
@@ -146,8 +184,7 @@ KaraokeNatin/
 └── CHANGELOG.md               # Version history
 ```
 
-There is no separate signaling service and no separate web client — both were
-folded into the host app. See `REPOMAPPING.md` for how the pieces connect.
+The native app embeds its signaling service and guest UI. The standalone `web/` site uses public brokers instead. See `REPOMAPPING.md` for how the pieces connect.
 
 ## 🤝 Contributing
 
@@ -161,12 +198,13 @@ folded into the host app. See `REPOMAPPING.md` for how the pieces connect.
 - 💡 **Ideas** — Share your feature suggestions
 
 ### How to Get Started
-1. Check our [existing issues](https://github.com/nojukuramu/KaraokeNatin/issues)
+1. Check this fork’s [existing issues](https://github.com/augustof2022/KaraokeNatinWeb/issues)
 2. Fork the repository and make your changes
 3. Submit a pull request with a clear description
 
 ### Report Issues
-Found a bug? Help us improve by reporting it on our [Issue Tracker](https://github.com/nojukuramu/KaraokeNatin/issues).
+Report fork-specific bugs on [this fork’s Issue Tracker](https://github.com/augustof2022/KaraokeNatinWeb/issues).
+For bugs that also affect the original project, see the [upstream Issue Tracker](https://github.com/nojukuramu/KaraokeNatin/issues).
 
 ## 📄 License
 

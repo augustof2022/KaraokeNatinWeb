@@ -1,0 +1,2436 @@
+/* KaraokeNatin — one stylesheet, two themes, two roles.
+ *
+ * Palette is a karaoke room: in dark, the lights-down midnight violet of a
+ * videoke booth with one neon magenta doing all the pointing; in light, the
+ * same room with the lights up — lavender paper and a deeper magenta that
+ * still clears contrast on white. Gold is kept for scores and winners, the
+ * colour the room already reads as "you did well". Headings are serif,
+ * everything else is the system sans — the contrast is what keeps it from
+ * reading generic.
+ *
+ * Layout targets: a phone held one-handed (the remote) and a TV or laptop
+ * (the host). The host view is deliberately a single screen — see "host stage
+ * layout" near the bottom; nothing there scrolls except the side panel's list.
+ */
+
+:root {
+  color-scheme: light;
+
+  --bg: #f7f4fc;
+  --bg-2: #ffffff;
+  --bg-3: #efe9f8;
+  --bg-4: #e4dbf2;
+  --line: #e1d8ef;
+  --line-2: #cdbfe4;
+  --ink: #1b1330;
+  --ink-2: #5d5677;
+  --ink-3: #7f7899;
+  --accent: #c8166e;
+  --accent-soft: rgba(200, 22, 110, 0.09);
+  --accent-ink: #ffffff;
+  --accent-rgb: 200, 22, 110;
+  --ok: #1d8660;
+  --warn: #a4640c;
+  --bad: #c42a3f;
+
+  --shadow-sm: 0 1px 2px rgba(27, 19, 48, 0.06);
+  --shadow: 0 4px 16px -6px rgba(27, 19, 48, 0.16);
+  --shadow-lg: 0 24px 60px -20px rgba(27, 19, 48, 0.3);
+
+  /* Stage lights: two soft spots at the top of the page. Faint enough in light
+     that it reads as paper tint, not decoration. */
+  --glow:
+    radial-gradient(60% 40% at 15% 0%, rgba(200, 22, 110, 0.06), transparent 70%),
+    radial-gradient(50% 40% at 90% 0%, rgba(110, 60, 220, 0.06), transparent 70%);
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --tap: 44px;
+
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* One easing for everything, so motion across the app feels like one hand.
+     The durations were tuned on a laptop and read as twitchy in a room: a
+     karaoke night is not an admin panel, and a panel that snaps into place
+     draws the eye away from the person singing. Everything is roughly half as
+     fast again, with a softer curve — present, unhurried, and still well
+     under the point where an interface starts to feel like it is waiting. */
+  --ease: cubic-bezier(0.22, 0.68, 0.28, 1);
+  --fast: 0.24s;
+  --mid: 0.42s;
+  --slow: 0.72s;
+}
+
+html[data-theme="dark"], :root.dark { color-scheme: dark; }
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #120c24;
+    --bg-2: #1a1332;
+    --bg-3: #231b41;
+    --bg-4: #2d2450;
+    --line: #2c2450;
+    --line-2: #3d3267;
+    --ink: #f4f0ff;
+    --ink-2: #b6aed2;
+    --ink-3: #8c84ac;
+    --accent: #ff4fa6;
+    --accent-soft: rgba(255, 79, 166, 0.15);
+    --accent-ink: #1a0822;
+    --accent-rgb: 255, 79, 166;
+    --ok: #4fd6a2;
+    --warn: #f5c451;
+    --bad: #ff7a8c;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+
+    --glow:
+      radial-gradient(60% 45% at 12% 0%, rgba(255, 79, 166, 0.14), transparent 70%),
+      radial-gradient(55% 45% at 92% 0%, rgba(124, 77, 255, 0.16), transparent 70%);
+  }
+}
+
+/* Explicit dark choice — same values, but winning over the light default
+   regardless of what the system prefers. */
+html[data-theme="dark"] {
+  --bg: #120c24;
+  --bg-2: #1a1332;
+  --bg-3: #231b41;
+  --bg-4: #2d2450;
+  --line: #2c2450;
+  --line-2: #3d3267;
+  --ink: #f4f0ff;
+  --ink-2: #b6aed2;
+  --ink-3: #8c84ac;
+  --accent: #ff4fa6;
+  --accent-soft: rgba(255, 79, 166, 0.15);
+  --accent-ink: #1a0822;
+  --accent-rgb: 255, 79, 166;
+  --ok: #4fd6a2;
+  --warn: #f5c451;
+  --bad: #ff7a8c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+
+  --glow:
+    radial-gradient(60% 45% at 12% 0%, rgba(255, 79, 166, 0.14), transparent 70%),
+    radial-gradient(55% 45% at 92% 0%, rgba(124, 77, 255, 0.16), transparent 70%);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.55 var(--sans);
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100dvh;
+  background-image: var(--glow);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  padding-bottom: env(safe-area-inset-bottom);
+  transition: background var(--mid) var(--ease), color var(--mid) var(--ease);
+}
+
+a { color: var(--accent); text-underline-offset: 2px; }
+
+/* An input carries a default intrinsic width (about 20 characters, and not the
+   same 20 in every engine). Inside a flex row that default is a floor, so one
+   text field can push a card wider than the phone holding it — the difference
+   between a layout that adapts and one that overflows off the right edge. */
+button, input { font: inherit; color: inherit; min-width: 0; }
+img, svg { max-width: 100%; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; }
+
+.view {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  animation: view-in var(--slow) var(--ease) both;
+}
+.view[hidden] { display: none; }
+
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ─────────────── home ─────────────── */
+
+.home-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 18px 0 0;
+}
+
+#view-home:not([hidden]) {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.hero {
+  text-align: center;
+  padding: 32px 0 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* A soft halo behind the mark, so the top of the page has a centre of gravity. */
+.mic {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, var(--accent-soft), transparent 68%);
+}
+
+.mic svg {
+  width: 60px;
+  height: 60px;
+  fill: var(--accent);
+  animation: breathe 8s ease-in-out infinite;
+  transform-origin: 50% 60%;
+}
+.mic .mic-arc { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; opacity: 0.75; }
+
+/* A slow, shallow breath — presence, not attention-seeking. */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50%      { transform: scale(1.045); opacity: 1; }
+}
+
+.hero h1 {
+  margin: 14px 0 10px;
+  font-size: clamp(38px, 8vw, 60px);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.hero h1 span { color: var(--accent); }
+
+.tagline { color: var(--ink-2); margin: 0 auto 36px; max-width: 40ch; font-size: 17px; }
+
+.choices {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+  text-align: left;
+  margin-bottom: 30px;
+}
+@media (min-width: 700px) { .choices { grid-template-columns: 1fr 1fr; } }
+
+.choice {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--mid) var(--ease), box-shadow var(--mid) var(--ease), transform var(--mid) var(--ease);
+}
+.choice:hover { border-color: var(--line-2); box-shadow: var(--shadow); transform: translateY(-2px); }
+.choice h2 { margin: 0 0 4px; font-size: 21px; }
+.choice p { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; }
+
+.join-form { display: flex; flex-wrap: wrap; gap: 8px; }
+#join-name {
+  flex: 1 1 100%;
+  min-width: 0;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  height: var(--tap);
+  text-align: center;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+#join-name:focus { border-color: var(--accent); outline: none; }
+#join-code {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  height: var(--tap);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-weight: 700;
+  text-align: center;
+  font-family: var(--mono);
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+#join-code:focus { background: var(--bg-2); }
+#join-code::placeholder { color: var(--ink-3); letter-spacing: 0.28em; font-weight: 400; }
+
+/* Library sits a step quieter than Host/Join — it is the side door. */
+.library-cta {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  transition: background var(--mid) var(--ease), border-color var(--mid) var(--ease);
+}
+.library-cta:hover { background: var(--bg-2); border-color: var(--accent); }
+.library-cta-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.library-cta-title { font-family: var(--serif); font-size: 18px; font-weight: 600; }
+.library-cta-go { display: inline-flex; color: var(--ink-3); transition: transform var(--mid) var(--ease), color var(--mid) var(--ease); }
+.library-cta:hover .library-cta-go { transform: translateX(4px); color: var(--accent); }
+
+/* The whole "how it works" story, in five words that people actually read. */
+.trust {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.trust li {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  animation: chip-in var(--slow) var(--ease) both;
+}
+.trust li:nth-child(1) { animation-delay: 0.05s; }
+.trust li:nth-child(2) { animation-delay: 0.11s; }
+.trust li:nth-child(3) { animation-delay: 0.17s; }
+.trust li:nth-child(4) { animation-delay: 0.23s; }
+.trust li:nth-child(5) { animation-delay: 0.29s; }
+
+@keyframes chip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.home-foot { text-align: center; color: var(--ink-3); font-size: 13px; padding-top: 36px; }
+.home-foot a { color: var(--ink-3); text-decoration: none; }
+.home-foot a:hover { color: var(--ink-2); text-decoration: underline; }
+.version-line { margin: 8px 0 0; display: flex; gap: 8px; justify-content: center; align-items: center; font-size: 12px; color: var(--ink-3); }
+.version-line [hidden] { display: none; }
+
+/* ─────────────── name gate ─────────────── */
+
+.gate-sub { color: var(--ink-2); font-size: 14px; margin: 0 0 16px; }
+.gate-form { display: flex; flex-direction: column; gap: 10px; }
+#name-gate-input {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  height: var(--tap);
+  padding: 0 14px;
+  width: 100%;
+  transition: border-color var(--fast) var(--ease);
+}
+#name-gate-input:focus { border-color: var(--accent); outline: none; }
+.gate-code { font-family: var(--mono); letter-spacing: 0.18em; }
+.gate-foot { margin: 14px 0 0; text-align: center; font-size: 13px; color: var(--ink-3); }
+
+/* ─────────────── theme toggle ─────────────── */
+
+.theme-btn {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.theme-btn:hover { border-color: var(--accent); }
+
+/* The button shows the theme you are in: a line-drawn sun in light, and in
+   dark a filled crescent in the warm yellow of a lamp left on. Drawing the
+   destination instead ("press for dark") reads as a state indicator that is
+   lying about the state, which is how the old circle-and-bite was read. */
+.theme-icon {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  color: var(--ink-2);
+  transition: color var(--mid) var(--ease), transform var(--slow) var(--ease);
+}
+.theme-icon .i { width: 17px; height: 17px; }
+.theme-btn:hover .theme-icon { color: var(--accent); }
+
+/* Dark: a full moon of a colour, filled rather than outlined, and turned a
+   few degrees so it does not sit like a logo. */
+.theme-btn-dark .theme-icon {
+  color: #f5c451;
+  transform: rotate(-16deg);
+}
+.theme-btn-dark .theme-icon .i {
+  fill: #f5c451;
+  filter: drop-shadow(0 0 6px rgba(245, 196, 81, 0.45));
+}
+.theme-btn-dark { border-color: rgba(245, 196, 81, 0.4); }
+.theme-btn-dark:hover { border-color: #f5c451; }
+
+/* ─────────────── icons ───────────────
+   Every icon is a 24×24 line drawing that inherits `currentColor`, so it picks
+   up hover, focus and dark mode from whatever it sits in. Size is set by the
+   host, never by the drawing. */
+
+.i {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: block;
+  overflow: visible;
+}
+
+.icon-btn .i { width: 17px; height: 17px; }
+.icon-btn.big .i { width: 19px; height: 19px; }
+.icon-btn.primary .i { width: 22px; height: 22px; }
+.modal-close .i { width: 16px; height: 16px; }
+.pill .i { width: 15px; height: 15px; color: var(--ink-3); }
+.fs-btn .i { width: 17px; height: 17px; }
+.library-cta-go .i { width: 20px; height: 20px; }
+.pl-caret { width: 15px; height: 15px; color: var(--ink-3); }
+.picker-tick { width: 16px; height: 16px; color: var(--accent); }
+
+/* ─────────────── buttons ─────────────── */
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0 18px;
+  height: var(--tap);
+  font-weight: 550;
+  cursor: pointer;
+  background: var(--bg-3);
+  color: var(--ink);
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease),
+              color var(--fast) var(--ease), transform var(--fast) var(--ease),
+              box-shadow var(--fast) var(--ease);
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--accent); filter: brightness(1.06); box-shadow: var(--shadow); }
+.btn-ghost { background: transparent; border-color: var(--line-2); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-quiet { background: transparent; border-color: var(--line); color: var(--ink-2); }
+.btn-quiet:hover { border-color: var(--line-2); color: var(--ink); }
+.btn-big { width: 100%; height: 52px; font-size: 16.5px; }
+.btn-sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+
+.icon-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  min-width: 34px;
+  height: 34px;
+  cursor: pointer;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease),
+              border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.icon-btn:hover { color: var(--accent); border-color: var(--accent); transform: translateY(-1px); }
+.icon-btn.big { min-width: var(--tap); height: var(--tap); }
+.icon-btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  min-width: 52px;
+  height: 52px;
+  box-shadow: var(--shadow-sm);
+}
+.icon-btn.primary:hover { color: var(--accent-ink); filter: brightness(1.06); box-shadow: var(--shadow); }
+
+/* ─────────────── room chrome ─────────────── */
+
+.room-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 0;
+  flex-wrap: wrap;
+  flex: none;
+}
+/* A guest scrolls; the room code and the connection state are the two things
+   that must not scroll away with the rest. The host never scrolls at all. */
+body.in-room:not(.is-host) .room-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+.head-left, .head-right { display: flex; align-items: center; gap: 8px; }
+.label { color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; }
+.code { font-family: var(--mono); font-size: 19px; letter-spacing: 0.16em; font-weight: 700; }
+
+.conn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  background: var(--bg-2);
+  transition: color var(--mid) var(--ease), border-color var(--mid) var(--ease);
+}
+.conn-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.conn-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); animation: pulse-soft 2.4s ease-in-out infinite; }
+.conn-bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+/* only the host renders the video and broker count */
+.host-only { display: none; }
+body.is-host .host-only { display: block; }
+body.is-host .pill.host-only { display: inline-flex; }
+
+/* Read by screen readers, invisible to everyone else. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ─────────────── stage ─────────────── */
+
+.stage {
+  position: relative;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.yt-mount {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  margin: 0 auto;
+}
+.yt-mount iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.player-error {
+  color: var(--warn);
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+.player-error-text { margin: 0; }
+/* Above the idle overlay: an unreadable, unpressable error is not an error
+ * message, it is a dead screen. */
+.player-error { position: relative; z-index: 6; }
+
+/* Autoplay prompt — sits over the video until the browser is satisfied. */
+.tap-to-play {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(14, 9, 30, 0.86);
+  border: 0;
+  color: #f4f0ff;
+  cursor: pointer;
+  padding: 20px;
+  text-align: center;
+  animation: view-in var(--mid) var(--ease) both;
+}
+.tap-to-play[hidden] { display: none; }
+.tap-icon {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--accent);
+  margin-bottom: 8px;
+  animation: halo 2.8s ease-out infinite;
+}
+@keyframes halo {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.45); }
+  70%  { box-shadow: 0 0 0 22px rgba(var(--accent-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0); }
+}
+.tap-text { font-size: 17px; font-weight: 600; font-family: var(--serif); }
+.tap-sub { font-size: 13px; color: #b6aed2; max-width: 34ch; }
+
+/* Always on screen, not on hover: the host screen is usually a TV or a tablet
+ * that never sends a hover, and a control you cannot point at is a control
+ * that is not there. It dims instead, and comes up to full on hover/focus. */
+.fs-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  background: rgba(14, 9, 30, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: #f4f0ff;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0.78;
+  transition: opacity var(--mid) var(--ease), background var(--mid) var(--ease);
+}
+.stage:hover .fs-btn, .fs-btn:hover, .fs-btn:focus-visible {
+  opacity: 1;
+  background: rgba(14, 9, 30, 0.85);
+}
+.fs-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.stage:fullscreen { border-radius: 0; box-shadow: none; }
+.stage:fullscreen .yt-mount { max-width: none; width: 100%; height: 100%; aspect-ratio: auto; }
+.stage:-webkit-full-screen { border-radius: 0; box-shadow: none; }
+.stage:-webkit-full-screen .yt-mount { max-width: none; width: 100%; height: 100%; aspect-ratio: auto; }
+
+/* One corner stand-in for the join code once fullscreen takes the header away.
+ * `body.stage-fullscreen` is set from script, so this does not depend on a
+ * single engine spelling `:fullscreen` the way this browser happens to.
+ *
+ * The QR and the code used to sit in opposite corners, which cost two corners
+ * of a television to say one thing twice. Stacked, the code reads as the
+ * caption to the thing you point a camera at — which is what it is — and
+ * somebody across the room who cannot resolve the modules can still type it. */
+.fs-join {
+  display: none;
+  position: absolute;
+  top: clamp(8px, 1vw, 18px);
+  right: clamp(8px, 1vw, 18px);
+  z-index: 4;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: clamp(5px, 0.6vw, 10px);
+  background: rgba(14, 9, 30, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+}
+body.stage-fullscreen .fs-join,
+.stage:fullscreen .fs-join { display: flex; }
+/* No width/height on the canvas on purpose — QR.draw sizes it to a whole
+ * number of pixels per module, and a CSS resize would smear the modules into
+ * an unscannable blur. It stays small; it just stays crisp. */
+.fs-qr {
+  display: block;
+  border-radius: 6px;
+}
+.fs-code {
+  font-family: var(--mono);
+  font-size: clamp(11px, 1vw, 20px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  color: #f4f0ff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+body.stage-fullscreen .invite-rail { display: none !important; }
+
+/* ── idle stage ──
+   An empty queue on the host screen is the moment somebody has to type
+   something, so the stage asks for it directly instead of being a void. */
+.stage-idle {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: #f4f0ff;
+  background: radial-gradient(120% 120% at 50% 0%, rgba(46, 26, 78, 0.96), rgba(10, 6, 22, 0.98));
+}
+.stage-idle[hidden] { display: none; }
+.stage-idle-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(18px, 2.4vw, 30px);
+  font-weight: 600;
+}
+.stage-search { display: flex; gap: 8px; width: min(520px, 100%); }
+.stage-search input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-sm);
+  color: #f4f0ff;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 15px;
+}
+.stage-search input::placeholder { color: #a39bc2; }
+.stage-search input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.stage-idle-hint { margin: 0; color: #a39bc2; font-size: 13px; }
+/* Fullscreen has no keyboard in front of it — the phones do. */
+.stage-idle-fs { display: none; margin: 0; color: #d2cbe8; font-size: clamp(14px, 1.8vw, 22px); }
+body.stage-fullscreen .stage-idle-fs, .stage:fullscreen .stage-idle-fs { display: block; }
+body.stage-fullscreen .stage-search,
+body.stage-fullscreen .stage-idle-hint,
+.stage:fullscreen .stage-search,
+.stage:fullscreen .stage-idle-hint { display: none; }
+
+/* ── the score ──
+   Sized in viewport units so the same card reads from a phone in the hand and
+   a television at the end of a room. */
+.score-card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  padding: 20px;
+  color: #fff;
+  background: radial-gradient(120% 120% at 50% 40%, rgba(40, 18, 62, 0.86), rgba(8, 5, 18, 0.95));
+}
+.score-card[hidden] { display: none; }
+.score-card.in { animation: score-in 900ms var(--ease) both; }
+@keyframes score-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.score-who {
+  margin: 0;
+  font-size: clamp(13px, 1.6vw, 20px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ddd6f0;
+}
+.score-value {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: clamp(72px, 18vw, 220px);
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5);
+}
+.score-line {
+  margin: 4px 0 0;
+  font-family: var(--serif);
+  font-size: clamp(16px, 2.6vw, 34px);
+  max-width: 24ch;
+}
+.score-card[data-band="great"] .score-value { color: #f0c23c; }
+.score-card[data-band="poor"] .score-value { color: #9a93b6; }
+.score-card.revealed[data-band="impossible"] .score-value {
+  color: #f0c23c;
+  animation: score-throb 1100ms var(--ease) infinite alternate;
+}
+@keyframes score-throb {
+  from { transform: scale(1); }
+  to   { transform: scale(1.05); }
+}
+
+/* ── the 10pm notice ──
+   One pass, right to left, and then it is gone for the night. */
+.curfew {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  z-index: 6;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(14, 9, 30, 0.72);
+  padding: 10px 0;
+}
+.curfew[hidden] { display: none; }
+.curfew-text {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  color: #ffd76e;
+  font-weight: 650;
+  font-size: clamp(15px, 2.2vw, 28px);
+  letter-spacing: 0.02em;
+}
+.curfew.run .curfew-text { animation: curfew-slide 20s linear 1; }
+@keyframes curfew-slide {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+
+/* ─────────────── now playing ─────────────── */
+
+.now { flex: none; }
+.now-card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-sm);
+}
+.now-thumb {
+  width: 92px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--bg-3);
+  flex: none;
+}
+img.thumb-missing { background: var(--bg-3); content-visibility: hidden; }
+
+.now-meta { min-width: 0; flex: 1; }
+.now-title {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.now-actions { margin-left: auto; display: flex; gap: 4px; flex: none; }
+.now-artist { color: var(--ink-2); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-by { color: var(--ink-3); font-size: 12px; }
+
+.empty { color: var(--ink-3); text-align: center; padding: 26px 8px; margin: 0; font-size: 14px; }
+
+/* ─────────────── transport ─────────────── */
+
+.transport {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 16px 14px;
+  box-shadow: var(--shadow-sm);
+  flex: none;
+}
+.seekrow { display: flex; align-items: center; gap: 12px; }
+.t { font-variant-numeric: tabular-nums; color: var(--ink-3); font-size: 12px; min-width: 42px; font-family: var(--mono); }
+.t:last-child { text-align: right; }
+.buttons { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+
+/* The mute toggle is the volume slider's own icon, not a separate control
+   floating beside it — one object, and one less rounded box in the row. */
+.volgroup { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 90px; }
+.vol-icon {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease);
+}
+.vol-icon:hover { color: var(--ink); }
+.vol-icon[aria-pressed="true"] { color: var(--warn); }
+.vol-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.vol-icon .i { width: 20px; height: 20px; }
+#vol { flex: 1; min-width: 60px; }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+  min-width: 0;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: 5px; border-radius: 999px; background: var(--bg-4); }
+input[type="range"]::-moz-range-track { height: 5px; border-radius: 999px; background: var(--bg-4); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 0;
+  transition: transform var(--fast) var(--ease);
+}
+input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.2); }
+input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+input[type="range"]:disabled { opacity: 0.4; cursor: default; }
+
+/* ─────────────── singers, scores, setup ─────────────── */
+
+.side-h {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 20px 0 8px;
+}
+.side-note { color: var(--ink-3); font-size: 12px; margin: 14px 2px 0; }
+
+.singer-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bg-4);
+  flex: none;
+  margin-left: 4px;
+}
+.singer-dot-lead { background: var(--accent); }
+.icon-btn.on { color: var(--accent); }
+
+.board { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+.board-lead { border-color: var(--accent); background: var(--accent-soft); }
+.board-rank {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-3);
+  min-width: 18px;
+  flex: none;
+}
+.board-meta { min-width: 0; flex: 1; }
+.board-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-sub { color: var(--ink-3); font-size: 12px; }
+.board-score {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.score-pill {
+  flex: none;
+  min-width: 42px;
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+}
+.score-pill[data-band="great"], .score-pill[data-band="impossible"] { background: var(--accent-soft); color: var(--accent); }
+
+.config { display: flex; flex-direction: column; gap: 4px; }
+.cfg {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.cfg:last-of-type { border-bottom: 0; }
+.cfg input { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--accent); flex: none; cursor: pointer; }
+.cfg input:disabled { cursor: default; }
+.cfg input:disabled ~ .cfg-text { opacity: 0.55; }
+.cfg-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cfg-text strong { font-size: 15px; font-weight: 600; }
+.cfg-text em { font-style: normal; color: var(--ink-3); font-size: 13px; }
+
+/* ─────────────── library sharing ─────────────── */
+
+.ls-menu { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.ls-phase[data-ls="show"] { text-align: center; }
+#ls-canvas { display: block; margin: 18px auto 0; }
+.ls-step { font-family: var(--mono); font-size: 13px; color: var(--ink-2); margin: 12px 0 0; text-align: center; }
+.ls-nav { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+.ls-video {
+  width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-sm);
+  background: #000;
+  object-fit: cover;
+  margin-top: 12px;
+}
+.dupes-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.dupes-actions .btn { flex: 1; }
+
+/* ─────────────── tabs ─────────────── */
+
+/* Eight labels never fitted a phone, and the row that scrolled to hold them
+   hid half of itself behind a fade. Icons are the same width at every language
+   and every screen, so the whole strip is visible at once — and the caption
+   underneath carries the word, which is what a bare icon row otherwise makes
+   you guess at. */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+  justify-content: space-between;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tabs.tabs-overflow {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+  justify-content: flex-start;
+}
+.tab {
+  position: relative;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 44px;
+  white-space: nowrap;
+  padding: 11px 8px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--mid) var(--ease), background var(--fast) var(--ease);
+}
+.tab-ico { display: grid; place-items: center; }
+.tab-ico .i { width: 20px; height: 20px; }
+/* `.tab` sets a display of its own, so anything that hides a tab has to
+   out-specify it — a bare `[hidden]`, or a class declared earlier in the file,
+   quietly loses and the tab stays on screen. */
+.tab[hidden] { display: none; }
+/* Setup belongs to whoever can actually change the room. */
+.tab.host-tab { display: none; }
+body.can-manage .tab.host-tab { display: inline-flex; }
+.tab:hover { color: var(--ink-2); background: var(--bg-3); }
+.tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-caption {
+  margin: 0 0 12px;
+  padding-top: 7px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: center;
+  transition: color var(--mid) var(--ease);
+}
+
+.badge {
+  background: var(--bg-3);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.badge[hidden] { display: none; }
+.tab.on .badge { background: var(--accent-soft); color: var(--accent); }
+/* Somebody is at the door, and it should be visible from the other tab. */
+.badge-alert { background: var(--accent); color: var(--accent-ink); }
+.badge-alert { animation: knock 2.4s var(--ease) infinite; }
+@keyframes knock {
+  0%, 70%, 100% { transform: scale(1); }
+  80%           { transform: scale(1.18); }
+}
+
+.panel { animation: panel-in var(--mid) var(--ease) both; }
+.panel[hidden] { display: none; }
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ─────────────── lists ─────────────── */
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.row:hover { border-color: var(--line-2); }
+.row-num { color: var(--ink-3); font-size: 12px; min-width: 16px; text-align: right; font-variant-numeric: tabular-nums; }
+.row-thumb { width: 62px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 7px; background: var(--bg-3); flex: none; }
+.row-meta { flex: 1; min-width: 0; }
+.row-title { font-size: 14px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sub { font-size: 12px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A result we could not confirm is shown, but not shown as if it were vetted. */
+.row-flag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.row-time { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.row-actions { display: flex; gap: 4px; flex: none; }
+.add-btn {
+  background: var(--accent);
+  border: 1px solid transparent;
+  color: var(--accent-ink);
+  border-radius: 9px;
+  height: 34px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-weight: 550;
+  flex: none;
+  transition: filter var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.add-btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+/* The per-row action cluster is too dense for a phone. Buttons marked `.opt`
+   have another route to the same thing, so they are the ones that go. */
+@media (max-width: 560px) {
+  .row-actions .opt { display: none; }
+  .row-num { display: none; }
+  .row-time { display: none; }
+  .code { font-size: 17px; letter-spacing: 0.12em; }
+}
+
+.clear { margin-top: 14px; }
+
+/* ─────────────── search ─────────────── */
+
+.search-form { display: flex; gap: 8px; margin-bottom: 10px; }
+#q {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  height: var(--tap);
+  padding: 0 14px;
+  transition: border-color var(--fast) var(--ease);
+}
+#q:focus { border-color: var(--accent); }
+.status { color: var(--ink-3); font-size: 13px; min-height: 20px; margin: 0 0 10px; }
+
+/* embed.js's probe players. Parked offscreen rather than display:none or
+ * visibility:hidden — a browser is entitled to skip work for a player it
+ * believes nobody can see, and the whole point of a probe is to get the same
+ * answer the visible host player would. Kept out of the tab order and out of
+ * the accessibility tree instead. */
+.embed-probes {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 320px;
+  height: 180px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ─────────────── invite panel ─────────────── */
+
+.share { text-align: center; padding: 8px 0 24px; }
+.qr { border-radius: 12px; background: #fff; padding: 8px; max-width: 100%; height: auto; box-shadow: var(--shadow-sm); }
+.share-code { font-family: var(--mono); font-size: 28px; font-weight: 700; letter-spacing: 0.2em; margin: 16px 0 2px; }
+.share-url { color: var(--ink-3); font-size: 13px; word-break: break-all; margin: 0 0 16px; }
+.share-actions { display: flex; gap: 8px; justify-content: center; margin-bottom: 22px; }
+.namefield { display: block; max-width: 300px; margin: 0 auto; text-align: left; font-size: 13px; color: var(--ink-2); }
+#name-input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  height: var(--tap);
+  padding: 0 14px;
+}
+#name-input:focus { border-color: var(--accent); }
+
+/* ─────────────── toasts ─────────────── */
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+  width: min(420px, calc(100vw - 24px));
+  pointer-events: none;
+}
+.toast {
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  padding: 11px 15px;
+  font-size: 14px;
+  box-shadow: var(--shadow-lg);
+  animation: rise var(--mid) var(--ease);
+}
+.toast-warn { border-color: var(--warn); color: var(--warn); }
+.toast.out { opacity: 0; transform: translateY(4px); transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+@keyframes rise { from { transform: translateY(10px); opacity: 0; } }
+
+/* ─────────────── modals ─────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+  animation: fade-in var(--mid) var(--ease) both;
+}
+.modal-backdrop[hidden] { display: none; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  position: relative;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px 26px;
+  max-width: 620px;
+  width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: modal-in var(--mid) var(--ease) both;
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+.modal-sm { max-width: 400px; }
+.modal h2 { margin: 0 0 6px; font-size: 22px; }
+.modal h3 { margin: 22px 0 6px; font-size: 13px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--sans); font-weight: 600; }
+.modal p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: 0;
+  color: var(--ink-3);
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.modal-close:hover { color: var(--ink); background: var(--bg-3); }
+
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font: inherit;
+  transition: color var(--fast) var(--ease);
+}
+.linklike:hover { color: var(--accent); }
+.muted-inline { color: var(--ink-3); font-weight: 400; font-size: 13px; }
+.room-fine { color: var(--ink-3); font-size: 12px; margin: 18px 0 0; }
+.code-plain { letter-spacing: 0; font-size: 20px; font-family: var(--serif); }
+
+/* ─────────────── library ─────────────── */
+
+.library[hidden] { display: none; }
+.lib-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.lib-tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 9px 12px;
+  color: var(--ink-3);
+  font-weight: 550;
+  cursor: pointer;
+  font-size: 14px;
+  transition: color var(--fast) var(--ease), border-color var(--mid) var(--ease);
+}
+.lib-tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+.lib-panel { animation: panel-in var(--mid) var(--ease) both; }
+.lib-panel[hidden] { display: none; }
+
+.pl {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: var(--bg-2);
+  transition: border-color var(--fast) var(--ease);
+}
+.pl:hover { border-color: var(--line-2); }
+.pl-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.pl-toggle {
+  background: none;
+  border: 0;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl-count { color: var(--ink-3); font-size: 12px; flex: none; }
+.pl-actions { display: flex; gap: 4px; flex: none; }
+.pl-songs { padding: 0 10px 10px; }
+
+.new-playlist { display: flex; gap: 8px; margin-top: 14px; }
+.new-playlist input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  height: var(--tap);
+  padding: 0 14px;
+}
+.new-playlist input:focus { border-color: var(--accent); }
+.lib-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+.icon-btn.star.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--accent-soft); }
+
+.picker-song { color: var(--ink-2); font-size: 13px; margin: 0 0 14px; }
+.picker-list { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.picker-item {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 550;
+  transition: border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.picker-item:hover:not(:disabled) { border-color: var(--accent); transform: translateX(2px); }
+.picker-item:disabled { color: var(--ink-3); cursor: default; }
+
+/* ─────────────── resume / install banners ─────────────── */
+
+.resume, .install-bar {
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin: 0 0 22px;
+  font-size: 14px;
+  animation: chip-in var(--slow) var(--ease) both;
+}
+.resume[hidden], .install-bar[hidden] { display: none; }
+.resume p { margin: 0 0 12px; }
+.resume-actions { display: flex; gap: 8px; justify-content: center; }
+
+.install-bar { display: flex; align-items: center; gap: 14px; text-align: left; }
+.install-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.install-text strong { font-size: 15px; }
+.install-text span { color: var(--ink-2); font-size: 13px; }
+.install-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+@media (max-width: 560px) {
+  .install-bar { flex-direction: column; align-items: stretch; }
+  .install-actions { justify-content: space-between; }
+  .install-actions .btn-primary { flex: 1; }
+}
+
+/* ─────────────── invite rail ─────────────── */
+
+.invite-rail { display: none; }
+.invite-rail[hidden] { display: none !important; }
+
+/* ─────────────── room layout ─────────────── */
+
+.room-body { display: flex; flex-direction: column; gap: 14px; }
+.stage-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.side-col { display: flex; flex-direction: column; min-width: 0; }
+.panels { min-width: 0; }
+
+/* ── host stage layout: one screen, nothing scrolls but the side list ──
+   The host is a TV or a laptop someone glances at from across the room:
+   video, what's playing, the controls and the queue all have to be visible
+   at once. The page itself is locked to the viewport and only the side
+   panel scrolls internally. Guests keep the ordinary flowing page. */
+@media (min-width: 900px) and (min-height: 560px) {
+  body.is-host { overflow: hidden; }
+  body.is-host #view-room {
+    max-width: 1560px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 24px calc(18px + env(safe-area-inset-bottom));
+  }
+  body.is-host .room-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 440px);
+    gap: 20px;
+    overflow: hidden;
+  }
+  body.is-host .stage-col { min-height: 0; }
+  body.is-host .stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  body.is-host .yt-mount { height: 100%; width: auto; max-width: 100%; aspect-ratio: 16 / 9; }
+  body.is-host .side-col { min-height: 0; overflow: hidden; }
+  body.is-host .panels { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+  /* `:not([hidden])` is load-bearing: a bare `.panel[data-panel="queue"]`
+     out-specifies the [hidden] attribute and leaves the queue showing
+     underneath whichever tab is actually selected. */
+  body.is-host .panel[data-panel="queue"]:not([hidden]) { display: flex; flex-direction: column; }
+  /* Same trade as the phone: the reorder arrows have "play next" as another
+     route, so they are what gives way to the song title in a narrow column. */
+  body.is-host .side-col .row-actions .opt,
+  body.is-host .side-col .row-num,
+  body.is-host .side-col .row-time { display: none; }
+  body.is-host .share { padding-top: 0; }
+
+  /* The join code lives permanently above the tabs — the single thing a new
+     guest needs, never more than a glance away. */
+  body.is-host .invite-rail {
+    display: block;
+    flex: none;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .rail-body {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    transition: opacity var(--mid) var(--ease);
+  }
+  .rail-body .qr { width: 96px; height: 96px; flex: none; padding: 6px; }
+  .rail-meta { min-width: 0; }
+  .rail-code { font-family: var(--mono); font-size: 24px; font-weight: 700; letter-spacing: 0.16em; margin: 0; }
+  .rail-hint { color: var(--ink-3); font-size: 12px; margin: 4px 0 0; }
+  .rail-toggle {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--line);
+    color: var(--ink-3);
+    cursor: pointer;
+    padding: 7px 0;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+  }
+  .rail-toggle:hover { color: var(--accent); background: var(--bg-3); }
+  /* The rail already shows the QR and the header already shows the code, so
+     the Invite tab would be a third copy of the same thing. */
+  body.is-host .tab-invite { display: none; }
+  /* The side column is a fixed slice of the screen and now carries six tabs;
+     they are tightened just enough to all be on screen at once. */
+  body.is-host .tab { padding: 10px 7px; font-size: 13px; letter-spacing: -0.01em; }
+  body.is-host .invite-rail.collapsed .rail-body { display: none; }
+  body.is-host .invite-rail.collapsed .rail-toggle { border-top: 0; }
+}
+
+/* Big-screen / TV: everything scales up a notch. */
+@media (min-width: 1600px) {
+  html { font-size: 17px; }
+  .code { font-size: 22px; }
+}
+
+/* ─────────────── phones ─────────────── */
+
+@media (max-width: 720px) {
+  .view { padding: 0 14px 28px; }
+  .hero { padding: 24px 0 8px; }
+
+  .room-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 8px;
+    padding: 10px 0;
+  }
+  /* `min-width: 0` lets the *column* shrink; it does not make a pill inside it
+     any narrower, so a long status ("waiting for the host…") kept its full
+     width and slid out under the badges on the right. Wrapping is the answer
+     rather than truncating: "c…" is not a connection status, and the second
+     line costs nothing on a header this short. */
+  .head-left { min-width: 0; flex-wrap: wrap; row-gap: 4px; }
+  .head-left .label { display: none; }
+  .head-right { justify-self: end; align-self: start; }
+
+  .now-thumb { width: 76px; }
+  .now-title { font-size: 16px; }
+
+  .transport { padding: 10px 12px 12px; }
+  /* Narrow enough that the row cannot sit left-aligned and still look
+     deliberate: the transport centres, and the volume takes its own line. */
+  .buttons { flex-wrap: wrap; row-gap: 10px; justify-content: center; }
+  .buttons .volgroup { order: 5; flex-basis: 100%; }
+  .now-actions { margin-left: 0; }
+
+  .tabs { gap: 0; }
+  .tab { padding: 10px 11px; font-size: 14px; }
+
+  .row { padding: 7px 8px; gap: 8px; }
+  .row-thumb { width: 54px; }
+  .row-title { font-size: 13px; }
+  .add-btn { padding: 0 12px; }
+  .row-actions { gap: 3px; }
+
+  /* Stack the search field over its button — a 2-up row leaves neither usable. */
+  .search-form { flex-wrap: wrap; }
+  .search-form #q { flex: 1 1 100%; }
+  .search-form .btn { flex: 1 1 100%; }
+
+  .lib-foot .btn { flex: 1; }
+  .modal { padding: 24px 20px; }
+}
+
+/* Installed, there is no browser chrome to scroll away — pad for the notch. */
+@media (display-mode: standalone) {
+  .room-head, .home-head { padding-top: max(12px, env(safe-area-inset-top)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Everything below arrived with the games, the statistics page, and the score
+   that counts up rather than appearing. Grouped here rather than threaded
+   through the file above so the seam is one place and not thirty.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the score's leaderboard ──
+   Slides in under the number once it has landed, and then physically moves
+   the singer to their new place. A table that is simply correct on arrival
+   tells you the result; one that moves shows you the climb, which is the part
+   worth being in the room for. */
+.score-board {
+  list-style: none;
+  margin: clamp(14px, 2.4vh, 30px) 0 0;
+  padding: 0;
+  width: min(460px, 76%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: board-in var(--slow) var(--ease) both;
+}
+.score-board[hidden] { display: none; }
+@keyframes board-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+.sb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: clamp(4px, 0.7vh, 9px) clamp(9px, 1.2vw, 15px);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: clamp(12px, 1.5vw, 20px);
+  /* The transform is set from script for the flip; the transition is what
+     turns a jump into a climb, and it is deliberately slow enough to follow. */
+  transition: transform 720ms var(--ease), background var(--mid) var(--ease);
+}
+.sb-rank { font-family: var(--mono); opacity: 0.55; min-width: 1.4em; }
+.sb-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-score { font-family: var(--serif); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sb-you { background: rgba(240, 194, 60, 0.2); }
+.sb-you .sb-score { color: #f0c23c; }
+
+/* A row that went up the table, and a row that has just appeared on it. */
+.row-climb { animation: climb-glow 1.4s var(--ease) both; }
+@keyframes climb-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(240, 194, 60, 0); }
+  35%  { box-shadow: 0 0 0 2px rgba(240, 194, 60, 0.65); }
+  100% { box-shadow: 0 0 0 0 rgba(240, 194, 60, 0); }
+}
+.row-enter { animation: row-enter var(--slow) var(--ease) both; }
+@keyframes row-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The score line waits for the number to finish before it says anything. */
+.score-line { opacity: 0; transition: opacity var(--slow) var(--ease); }
+.score-card.revealed .score-line { opacity: 1; }
+
+/* ── the wheel ── */
+.spin-card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.4vh, 16px);
+  text-align: center;
+  padding: 20px;
+  color: #fff;
+  background: radial-gradient(120% 120% at 50% 40%, rgba(44, 18, 60, 0.9), rgba(8, 5, 18, 0.96));
+  animation: score-in var(--slow) var(--ease) both;
+}
+.spin-card[hidden] { display: none; }
+.spin-title {
+  margin: 0;
+  font-size: clamp(11px, 1.4vw, 17px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #c8a3e8;
+}
+.spin-label { margin: 0; font-family: var(--serif); font-size: clamp(16px, 2.4vw, 32px); }
+/* A fixed window, so a long title does not make the whole card jump about
+   while the wheel is spinning through titles of every length. */
+.spin-window {
+  width: min(760px, 88%);
+  padding: clamp(10px, 1.8vh, 22px) clamp(14px, 2vw, 28px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.spin-reel {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: clamp(20px, 4.4vw, 58px);
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spin-reel.flip { animation: reel-step 140ms var(--ease); }
+.spin-card.landed .spin-window {
+  border-color: #f0c23c;
+  background: rgba(240, 194, 60, 0.14);
+  animation: landed 900ms var(--ease) both;
+}
+.spin-card.landed .spin-reel { color: #f0c23c; }
+@keyframes landed {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.spin-sub { margin: 0; color: #d2cbe8; font-size: clamp(12px, 1.6vw, 19px); }
+
+/* ── going round again ──
+   Three seconds, counted down where you can see it. An offer that expires
+   silently reads as a button that did not work. */
+.spin-again {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(12px, 4vh, 44px);
+  transform: translateX(-50%);
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(14, 9, 30, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f4f0ff;
+  box-shadow: var(--shadow-lg);
+  animation: rise var(--mid) var(--ease) both;
+}
+.spin-again[hidden] { display: none; }
+.spin-again-text { font-size: 14px; white-space: nowrap; }
+.spin-again-count {
+  font-family: var(--mono);
+  font-size: 13px;
+  min-width: 22px;
+  text-align: center;
+  opacity: 0.7;
+}
+/* Everyone in the room votes, so everyone gets the buttons — a show of hands
+   only the host may raise is not a show of hands. */
+.spin-again .btn { transition: filter var(--fast) var(--ease), outline-color var(--fast) var(--ease); }
+/* Your own hand, marked in a colour that reads on both the filled primary and
+   the quiet one — an accent ring around an accent-filled button is invisible,
+   which is the one place it needed to be visible. */
+.spin-again .btn.voted {
+  outline: 2px solid #f0c23c;
+  outline-offset: 2px;
+  filter: brightness(1.06);
+}
+/* On a phone it is not sitting over a video, so it is a bar in the flow
+   rather than something floating over the stage. */
+#spin-slot-guest .spin-again {
+  position: static;
+  transform: none;
+  width: 100%;
+  justify-content: center;
+  border-radius: var(--radius);
+  margin: 4px 0 14px;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+/* ── up next ──
+   Small, cornered, and gone again. It exists so the next singer stands up,
+   not so anybody stops watching the one still going. */
+.up-next {
+  position: absolute;
+  left: clamp(8px, 1.4vw, 22px);
+  bottom: clamp(8px, 1.4vw, 22px);
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  max-width: min(60%, 620px);
+  padding: clamp(6px, 0.8vw, 11px) clamp(10px, 1.2vw, 18px);
+  border-radius: 12px;
+  background: rgba(14, 9, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(4px);
+  color: #f4f0ff;
+  pointer-events: none;
+}
+.up-next[hidden] { display: none; }
+.up-next.in { animation: upnext-in var(--slow) var(--ease) both; }
+@keyframes upnext-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+.up-next-label {
+  font-size: clamp(9px, 0.85vw, 13px);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  flex: none;
+}
+.up-next-title {
+  font-size: clamp(13px, 1.4vw, 21px);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.up-next-who { font-size: clamp(11px, 1vw, 16px); color: #a39bc2; flex: none; }
+
+/* ── an advert is playing ── */
+/* Sits to the left of the fullscreen button rather than under it — both live
+   in the bottom-right corner, and an advert notice covering the only way out
+   of fullscreen would be a poor trade. */
+.ad-note {
+  position: absolute;
+  right: clamp(58px, 1.4vw + 46px, 72px);
+  bottom: clamp(8px, 1.4vw, 22px);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(14, 9, 30, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #d2cbe8;
+  font-size: clamp(11px, 1vw, 15px);
+  pointer-events: none;
+}
+.ad-note[hidden] { display: none; }
+.ad-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  animation: pulse-dot 2.2s var(--ease) infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* ── the lobby ── */
+.lobby-wait {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 4px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  animation: rise var(--mid) var(--ease) both;
+}
+.lobby-wait[hidden] { display: none; }
+.lobby-wait-ico { color: var(--accent); flex: none; margin-top: 2px; }
+.lobby-wait-ico .i { width: 20px; height: 20px; }
+.lobby-wait div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.lobby-wait span { font-size: 13px; color: var(--ink-2); }
+/* Nothing below the banner is real yet, so it does not pretend to be. */
+body.in-lobby .stage-col,
+body.in-lobby .tabs,
+body.in-lobby .tab-caption,
+body.in-lobby .panels { opacity: 0.35; pointer-events: none; }
+
+.side-h-alert { color: var(--accent); }
+.row-pending { border-color: var(--accent); background: var(--accent-soft); }
+.singer-dot-wait { background: var(--accent); animation: pulse-dot 1.8s var(--ease) infinite; }
+
+/* ── the games tab ──
+   A menu of tiles rather than one game's worth of controls spilled across the
+   panel. The roulette opens from its tile: as a sheet on a phone, and inline
+   beside the player on anything wider, because a modal on a host screen would
+   black out the one thing the room is watching in order to ask a question
+   about it. */
+.game-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.game-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: inherit;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.game-tile:hover { border-color: var(--accent); transform: translateY(-1px); }
+.game-tile[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.game-tile[aria-expanded="true"] .game-tile-go { transform: rotate(90deg); }
+.game-tile-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.game-tile-title { font-family: var(--serif); font-size: 16px; font-weight: 600; }
+.game-tile-sub {
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.game-tile-go { color: var(--ink-3); flex: none; display: grid; place-items: center; transition: transform var(--mid) var(--ease); }
+.game-tile-go .i { width: 18px; height: 18px; }
+
+.game-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.game-ico .i { width: 22px; height: 22px; }
+.game-ico-sm { width: 28px; height: 28px; border-radius: 9px; }
+.game-ico-sm .i { width: 17px; height: 17px; }
+.game-sub { margin: 3px 0 12px; font-size: 13px; color: var(--ink-3); }
+
+.roulette { animation: panel-in var(--mid) var(--ease) both; }
+.roulette[hidden] { display: none; }
+/* Inline, it reads as the tile above it having opened: it hangs off the
+   bottom of that tile, and drops the title and strapline the tile is already
+   showing three lines higher. In the sheet both are the only thing naming it,
+   so both stay. */
+#roulette-slot-inline .roulette {
+  margin: -9px 0 4px;
+  padding: 18px 14px 14px;
+  border: 1px solid var(--accent);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--bg-2);
+}
+#roulette-slot-inline .roulette-head,
+#roulette-slot-inline .game-sub { display: none; }
+/* The tile loses its bottom corners to the panel hanging off it. */
+.game-tile[aria-expanded="true"] { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+/* The modal stylesheet turns every h3 into a small uppercase accent label,
+   which is right for the disclaimer's section headings and wrong for a panel
+   title — so this one says what it is rather than inheriting it. */
+.roulette-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--ink);
+}
+.roulette-pool { margin-bottom: 10px; max-height: 38vh; overflow-y: auto; }
+.roulette-opts { margin: 4px 0 10px; }
+.cfg-inline { border-bottom: 0; padding: 9px 2px; }
+
+/* The action row was a 50/50 split between a primary and a destructive
+   button, which put "Empty the pot" beside "Add a round" at equal weight and
+   made the card look broken the moment the pot had anything in it. They are
+   not equals: one is the thing you came for, the other is a thing you almost
+   never want. */
+.game-actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.game-actions .btn { width: 100%; }
+.linklike-bad { color: var(--ink-3); align-self: center; font-size: 12px; padding: 4px; }
+.linklike-bad:hover { color: var(--bad); }
+.linklike-bad[hidden] { display: none; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.row-game { border-style: dashed; border-color: var(--accent); background: var(--accent-soft); }
+.row-gameicon {
+  width: 62px;
+  aspect-ratio: 16 / 9;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--bg-3);
+  color: var(--accent);
+}
+
+/* On a phone the roulette is a sheet: it rises from the bottom, takes the
+   screen it needs, and leaves. */
+/* On anything wider it is just a modal; `.modal` already scrolls and caps its
+   own height. Only the phone needs it turned into a sheet. */
+@media (max-width: 720px) {
+  .modal-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    max-height: 90dvh;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    animation: sheet-in var(--mid) var(--ease) both;
+  }
+  @keyframes sheet-in {
+    from { transform: translateY(28px); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+  }
+}
+
+/* The add-to-playlist chooser's roulette shortcut. */
+.picker-roulette {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: inherit;
+  cursor: pointer;
+  transition: filter var(--fast) var(--ease);
+}
+.picker-roulette[hidden] { display: none; }
+.picker-roulette:hover { filter: brightness(1.04); }
+.picker-roulette-ico { color: var(--accent); flex: none; }
+.picker-roulette span span,
+.picker-roulette > span:last-child { display: flex; flex-direction: column; }
+.picker-roulette em { font-style: normal; font-size: 12px; color: var(--ink-3); }
+
+/* ── a result we are sure is a karaoke track ──
+   The border shifts through purple, pink and orange rather than sitting on one
+   colour: this is the row the room came for, and in a list of twenty it has to
+   be findable without reading a word. Only shown at high confidence — a badge
+   handed out on a hunch stops meaning anything by the third search. */
+/* The badge hangs off the top edge, so the row needs somewhere to hang it —
+   without this it lands on the row above, which in a list of results is
+   somebody else's title. */
+.row-karaoke { margin-top: 7px; }
+.list > .row-karaoke:first-child { margin-top: 3px; }
+.row-karaoke {
+  position: relative;
+  border-color: transparent;
+  background:
+    linear-gradient(var(--bg-2), var(--bg-2)) padding-box,
+    linear-gradient(115deg, #a855f7, #ec4899, #f97316, #a855f7) border-box;
+  background-size: auto, 300% 300%;
+  border: 1.5px solid transparent;
+  animation: karaoke-shift 9s linear infinite;
+}
+@keyframes karaoke-shift {
+  from { background-position: 0 0, 0% 50%; }
+  to   { background-position: 0 0, 300% 50%; }
+}
+.karaoke-badge {
+  position: absolute;
+  top: -9px;
+  left: 12px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(115deg, #a855f7, #ec4899, #f97316, #a855f7);
+  background-size: 300% 300%;
+  animation: karaoke-shift 9s linear infinite;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+/* ── dragging a queue row ── */
+.row-grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: grab;
+  /* The browser's own scroll gesture and ours cannot both own a vertical
+     drag; this hands vertical movement on the handle to us and leaves the
+     rest of the row scrolling the page as normal. */
+  touch-action: none;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.row-grip:hover { color: var(--ink); background: var(--bg-3); }
+.row-grip:active { cursor: grabbing; }
+.row-grip .i { width: 16px; height: 16px; }
+.row-dragging {
+  position: relative;
+  z-index: 3;
+  cursor: grabbing;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lg);
+  opacity: 0.97;
+}
+/* Rows shuffling out of the way move; the row under the finger does not, or
+   it would lag behind the finger by the length of the transition. */
+.list-dragging .row { transition: transform var(--mid) var(--ease); }
+.list-dragging .row-dragging { transition: none; }
+.list-dragging { user-select: none; }
+
+/* ── the statistics page ── */
+.stats-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 6px 0 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-3);
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.stats-privacy strong { color: var(--ink); }
+.stats-privacy-ico { color: var(--ok); flex: none; margin-top: 1px; }
+.stats-privacy-ico .i { width: 20px; height: 20px; }
+
+.stats-empty { text-align: center; padding: 60px 20px; }
+.stats-empty[hidden] { display: none; }
+.stats-empty-title { font-family: var(--serif); font-size: 22px; margin: 0 0 6px; }
+.stats-empty-sub { margin: 0; color: var(--ink-3); font-size: 14px; }
+#stats-body[hidden] { display: none; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.stat {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  padding: 16px 16px 14px;
+  animation: rise var(--slow) var(--ease) both;
+  transition: border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.stat:hover { border-color: var(--line-2); transform: translateY(-2px); }
+/* The one number anybody actually came for. */
+.stat-hero {
+  grid-column: span 2;
+  background: linear-gradient(140deg, var(--accent-soft), var(--bg-2) 70%);
+  border-color: var(--accent);
+}
+.stat-value {
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.stat-hero .stat-value { font-size: 52px; color: var(--accent); }
+.stat-label {
+  margin-top: 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.stat-sub { margin-top: 3px; font-size: 12px; color: var(--ink-3); }
+
+.stat-games { display: flex; flex-direction: column; gap: 10px; }
+.game-stat {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  padding: 13px 15px;
+}
+.game-stat-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.game-stat-ico { color: var(--accent); display: grid; place-items: center; }
+.game-stat-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-4);
+  overflow: hidden;
+}
+.game-stat-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #f0c23c);
+  transition: width var(--slow) var(--ease);
+}
+.game-stat-nums { margin-top: 7px; font-size: 12px; color: var(--ink-3); }
+
+.stats-foot { margin-top: 32px; text-align: center; }
+.stats-foot .btn[hidden] { display: none; }
+
+@media (max-width: 560px) {
+  .stat-hero { grid-column: span 2; }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spin-again { flex-wrap: wrap; justify-content: center; border-radius: var(--radius); }
+}
+
+/* The roulette while it is spinning, in the now-playing card. */
+.now-gameicon { width: 76px; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   The party layer: confetti, stage lights, and the number doing more than
+   changing. Everything here is decoration on top of cards that already work
+   without it — the reduced-motion rule above switches all of it off, and
+   js/fx.js throws no confetti at all when it is on.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── confetti (js/fx.js) ──
+   One element per piece. The path is two legs: thrown out and up, slowing,
+   then falling and fluttering off the bottom. The per-keyframe timing
+   functions are what make it look thrown rather than slid. */
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fx-layer.fx-fixed { position: fixed; z-index: 90; }
+.confetti {
+  position: absolute;
+  width: 8px;
+  height: 14px;
+  margin: -7px 0 0 -4px;
+  border-radius: 2px;
+  will-change: transform, opacity;
+  animation: confetti-fly var(--dur, 2s) both;
+}
+.confetti-dot { width: 9px; height: 9px; margin: -4px 0 0 -4px; border-radius: 50%; }
+@keyframes confetti-fly {
+  0% {
+    transform: translate(0, 0) rotate3d(1, 0.4, 0, 0deg) scale(0.5);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.12, 0.72, 0.3, 1);
+  }
+  28% {
+    transform: translate(var(--cx), var(--cy)) rotate3d(1, 0.4, 0, calc(var(--spin) * 0.3)) scale(1);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.85, 0.55);
+  }
+  85% { opacity: 1; }
+  100% {
+    transform: translate(calc(var(--cx) + var(--drift)), var(--fall)) rotate3d(1, 0.4, 0, var(--spin)) scale(0.9);
+    opacity: 0;
+  }
+}
+
+/* ── stage lights ──
+   Slow rays turning behind the score and the wheel. They come up when there
+   is something to look at — the number landing, the wheel spinning — so the
+   card feels lit rather than decorated. */
+.score-card, .spin-card { overflow: hidden; isolation: isolate; }
+.score-card::before, .spin-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 44%;
+  width: 190vmax;
+  height: 190vmax;
+  margin: -95vmax 0 0 -95vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 79, 166, 0.13) 0deg 7deg, transparent 7deg 20deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 8%, transparent 62%);
+  mask-image: radial-gradient(closest-side, #000 8%, transparent 62%);
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+  animation: rays-turn 40s linear infinite;
+  pointer-events: none;
+}
+@keyframes rays-turn { to { transform: rotate(360deg); } }
+.score-card.revealed::before { opacity: 1; }
+.score-card[data-band="great"]::before,
+.score-card[data-band="impossible"]::before,
+.spin-card.landed::before {
+  background: repeating-conic-gradient(from 0deg, rgba(245, 196, 81, 0.16) 0deg 7deg, transparent 7deg 20deg);
+}
+.score-card[data-band="impossible"]::before { animation-duration: 12s; }
+.score-card[data-band="poor"]::before { opacity: 0; }
+.spin-card.spinning::before { opacity: 0.8; animation-duration: 8s; }
+.spin-card.landed::before { opacity: 1; }
+
+/* ── the number ── */
+.score-value {
+  color: #ff4fa6;
+  text-shadow: 0 0 22px rgba(255, 79, 166, 0.55), 0 6px 30px rgba(0, 0, 0, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+.score-card[data-band="great"] .score-value,
+.score-card[data-band="impossible"] .score-value {
+  text-shadow: 0 0 26px rgba(245, 196, 81, 0.6), 0 6px 30px rgba(0, 0, 0, 0.5);
+}
+.score-card[data-band="poor"] .score-value { text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5); }
+
+/* While it climbs: a kick on every new number. */
+.score-card.counting .score-value.bump { animation: value-bump 180ms ease-out; }
+@keyframes value-bump {
+  from { transform: scale(1.07); }
+  to   { transform: scale(1); }
+}
+
+/* When it lands: a spring past its size and back, then the band's own act. */
+.score-card.revealed .score-value { animation: value-pop 760ms cubic-bezier(0.2, 1.7, 0.4, 1) both; }
+@keyframes value-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+.score-card.revealed[data-band="great"] .score-value {
+  animation: value-pop 760ms cubic-bezier(0.2, 1.7, 0.4, 1) both,
+             value-glow 1.6s ease-in-out 760ms infinite alternate;
+}
+@keyframes value-glow {
+  from { text-shadow: 0 0 20px rgba(245, 196, 81, 0.45), 0 6px 30px rgba(0, 0, 0, 0.5); }
+  to   { text-shadow: 0 0 46px rgba(245, 196, 81, 0.9), 0 6px 30px rgba(0, 0, 0, 0.5); }
+}
+/* 101 breaks the machine, so it gets every colour the machine has. */
+.score-card.revealed[data-band="impossible"] .score-value {
+  background: linear-gradient(90deg, #f5c451, #ff4fa6, #b36bff, #4fd6a2, #f5c451) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 22px rgba(255, 79, 166, 0.6));
+  animation: value-pop 760ms cubic-bezier(0.2, 1.7, 0.4, 1) both,
+             value-rainbow 2.4s linear infinite,
+             score-throb 1100ms var(--ease) 760ms infinite alternate;
+}
+@keyframes value-rainbow { to { background-position: 300% 0; } }
+/* A low score droops instead of popping — the sad trombone's picture. */
+.score-card.revealed[data-band="poor"] .score-value {
+  animation: value-droop 1.5s var(--ease) both;
+  transform-origin: 30% 90%;
+}
+@keyframes value-droop {
+  0%   { transform: none; }
+  25%  { transform: rotate(-7deg) translateY(4%); }
+  45%  { transform: rotate(4deg) translateY(2%); }
+  70%  { transform: rotate(-3deg) translateY(6%); }
+  100% { transform: rotate(-4deg) translateY(6%); }
+}
+
+.score-card.in .score-who { animation: who-in 800ms var(--ease) both; }
+@keyframes who-in {
+  from { opacity: 0; transform: translateY(-14px); letter-spacing: 0.42em; }
+  to   { opacity: 1; transform: none; letter-spacing: 0.16em; }
+}
+.score-line {
+  transform: translateY(10px) scale(0.96);
+  transition: opacity var(--slow) var(--ease), transform var(--slow) cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.score-card.revealed .score-line { transform: none; }
+
+/* ── the wheel's lights ──
+   A ring of bulbs round the window, chasing while it spins and flashing when
+   it lands: the one picture everybody already has of a game show wheel. */
+.spin-window { position: relative; }
+.spin-window::before {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  padding: 9px;
+  border-radius: 22px;
+  background: radial-gradient(circle, #ffe7a3 0 2.6px, rgba(245, 196, 81, 0.5) 3.4px, transparent 5px) 0 0 / 20px 20px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0.45;
+  animation: bulbs-chase 1.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes bulbs-chase { to { background-position: 20px 0; } }
+.spin-card.spinning .spin-window::before { opacity: 1; animation-duration: 0.36s; }
+.spin-card.landed .spin-window::before { opacity: 1; animation: bulbs-flash 260ms steps(1) 6; }
+@keyframes bulbs-flash { 50% { opacity: 0.15; } }
+.spin-card.landed .spin-window { box-shadow: 0 0 40px -6px rgba(245, 196, 81, 0.6); }
+
+/* Motion blur on each step: the name is going past, not being replaced. */
+@keyframes reel-step {
+  from { opacity: 0.25; transform: translateY(-42%); filter: blur(3px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+.spin-card.landed .spin-reel { animation: reel-land 700ms cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes reel-land {
+  0%   { transform: scale(0.9); text-shadow: none; }
+  40%  { transform: scale(1.12); text-shadow: 0 0 30px rgba(245, 196, 81, 0.9); }
+  100% { transform: scale(1); text-shadow: 0 0 18px rgba(245, 196, 81, 0.5); }
+}
+.spin-title { animation: neon-on 1.2s steps(1) both; text-shadow: 0 0 12px rgba(179, 107, 255, 0.7); }
+@keyframes neon-on {
+  0%, 12%, 20%, 34% { opacity: 0.2; }
+  8%, 16%, 28%, 100% { opacity: 1; }
+}
+
+/* ── the countdown to going again ── */
+.spin-again-count { display: inline-block; transition: color var(--fast) var(--ease); }
+.spin-again-count.beat { animation: count-beat 420ms cubic-bezier(0.2, 1.6, 0.4, 1); }
+.spin-again-count.urgent { color: #ff4fa6; opacity: 1; font-weight: 700; }
+@keyframes count-beat {
+  from { transform: scale(1.6); }
+  to   { transform: scale(1); }
+}
+.spin-again .btn.voted { animation: vote-pop 380ms cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes vote-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* ── up next: a neon edge that runs along it once as it arrives ── */
+.up-next { overflow: hidden; }
+.up-next.in::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 79, 166, 0.35) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: sheen 1.4s var(--ease) 300ms both;
+  pointer-events: none;
+}
+@keyframes sheen { to { transform: translateX(100%); } }
