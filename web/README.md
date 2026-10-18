@@ -91,6 +91,25 @@ page believed about its connection was frozen along with it, so none of it can b
   re-broadcasts the room — so the guest list is not full of people who left during the nap,
   and everyone still there is looking at the same queue.
 
+## Playback performance and buffering
+
+The host plays YouTube directly in the browser. Phone remotes and GitHub Pages
+hosting do not relay the video stream. Smooth playback still depends on the host’s
+browser, device, Wi-Fi, and connection to YouTube—not only a speed-test result.
+
+YouTube’s own player controls are available on the video. If playback buffers,
+open its settings menu and try **Quality → 480p or 360p**, when that menu is
+available. The app does not force a resolution; YouTube controls quality selection.
+Use the room’s fullscreen button to retain the join QR code and score overlays.
+Keep the host tab in the foreground. If it still pauses, compare the same video
+directly on YouTube on the same device, browser profile, and quality setting.
+
+Playback-clock updates only repaint the progress display and send throttled guest
+snapshots. They do not rebuild the queue/leaderboard or rewrite unchanged room
+storage every second. Real queue, guest, and sound-setting changes still update
+and save immediately. These changes reduce app-side work; they cannot guarantee
+that YouTube’s video stream will never buffer.
+
 ## Search
 
 Two independent public mirror networks, tried in order, several hosts at a time:
@@ -500,6 +519,8 @@ Individual checks below run from `web/` after installing the test runner:
 
 ```bash
 node tools/qr-test.js         # QR conformance: module counts, block layouts, capacities
+node tools/player-controls-test.js # quality controls, sound readback, buffering events
+node tools/playback-performance-e2e.js # progress without rebuilding the room or rewriting storage
 node tools/leave-room-e2e.js  # app confirmation, room teardown, delayed player setup
 node tools/youtube-setup-e2e.js # optional account guidance, safe popup, skip, room restore
 node tools/e2e.js             # two real browsers, one real WebRTC link (needs playwright)

@@ -372,6 +372,21 @@
       app.state.player.time = t;
       app.state.player.duration = d;
 
+      // The native YouTube controls can also change sound settings. Keep
+      // the room controls and guest snapshots in step without repainting
+      // the whole room on ordinary clock ticks.
+      var volume = app.player.volume();
+      var muted = app.player.mute();
+      var soundChanged = false;
+      if (typeof volume === "number" && isFinite(volume) && volume !== app.state.player.volume) {
+        app.state.player.volume = volume;
+        soundChanged = true;
+      }
+      if (typeof muted === "boolean" && muted !== app.state.player.muted) {
+        app.state.player.muted = muted;
+        soundChanged = true;
+      }
+
       var ad = adPlaying();
       var note = $("#ad-note");
       if (note) note.hidden = !ad;
@@ -387,7 +402,8 @@
       }
 
       renderProgress();
-      if (moved) broadcastState({ quiet: true, progress: true });
+      if (soundChanged) broadcastState({ progress: true });
+      else if (moved) broadcastState({ quiet: true, progress: true, playbackOnly: true });
     }, 1000);
   }
 
@@ -1313,8 +1329,15 @@
     // must not count as a revision — otherwise a guest's view is "stale" the
     // instant a song is playing and every real command gets bounced.
     if (!(opts && opts.progress)) app.state.rev++;
-    render();
-    persistHost();
+    // The ticker has already painted the changing clock. Rebuilding the
+    // queue, scores and controls (and saving unchanged room data) every
+    // second takes work away from video playback on slower host devices.
+    // Other progress broadcasts also carry guest/name changes and still
+    // need a full render, so only the ticker opts out explicitly.
+    if (!(opts && opts.playbackOnly)) {
+      render();
+      persistHost();
+    }
 
     // Progress ticks would otherwise flood the channel once a second per guest.
     var quiet = opts && opts.quiet;
@@ -1323,7 +1346,7 @@
     if (quiet && now - lastBroadcast < 2500) {
       clearTimeout(broadcastPending);
       broadcastPending = setTimeout(function () {
-        broadcastState({ quiet: true, progress: progress });
+        broadcastState({ quiet: true, progress: progress, playbackOnly: opts && opts.playbackOnly });
       }, 2500);
       return;
     }
@@ -3267,7 +3290,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.3";
+  var APP_VERSION = "2.6.4";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;

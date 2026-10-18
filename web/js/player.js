@@ -188,9 +188,13 @@
       if (ready && yt.stopVideo) yt.stopVideo();
     };
     self.seek = function (t) { if (ready && yt.seekTo) yt.seekTo(Math.max(0, t), true); };
-    self.volume = function (v) { if (ready && yt.setVolume) yt.setVolume(Math.max(0, Math.min(100, v))); };
+    self.volume = function (v) {
+      if (v === undefined) return ready && yt.getVolume ? yt.getVolume() : undefined;
+      if (ready && yt.setVolume) yt.setVolume(Math.max(0, Math.min(100, v)));
+    };
     self.mute = function (on) {
       if (!ready) return;
+      if (on === undefined) return yt.isMuted ? yt.isMuted() : undefined;
       if (on) yt.mute(); else yt.unMute();
     };
     self.time = function () { return ready && yt.getCurrentTime ? yt.getCurrentTime() || 0 : 0; };
@@ -209,11 +213,12 @@
         yt = new YT.Player(elementId, {
           height: "100%",
           width: "100%",
-          // Same configuration as the desktop app: the default youtube.com
-          // host, no native chrome (the room supplies its own transport).
+          // Keep YouTube's quality menu available. Room fullscreen preserves
+          // the QR code and overlays, so use our fullscreen button instead.
           playerVars: {
             autoplay: 0,
-            controls: 0,
+            controls: 1,
+            fs: 0,
             disablekb: 1,
             rel: 0,
             modestbranding: 1,

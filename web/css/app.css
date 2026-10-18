@@ -645,8 +645,8 @@ body.is-host .pill.host-only { display: inline-flex; }
  * that is not there. It dims instead, and comes up to full on hover/focus. */
 .fs-btn {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  left: 12px;
+  top: 12px; /* Keep the lower-right YouTube quality menu clear when open. */
   z-index: 3;
   background: rgba(14, 9, 30, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1808,7 +1808,7 @@ body.can-manage .tab.host-tab { display: inline-flex; }
 .up-next {
   position: absolute;
   left: clamp(8px, 1.4vw, 22px);
-  bottom: clamp(8px, 1.4vw, 22px);
+  bottom: 56px;
   z-index: 4;
   display: flex;
   align-items: baseline;
@@ -1845,13 +1845,11 @@ body.can-manage .tab.host-tab { display: inline-flex; }
 .up-next-who { font-size: clamp(11px, 1vw, 16px); color: #a39bc2; flex: none; }
 
 /* ── an advert is playing ── */
-/* Sits to the left of the fullscreen button rather than under it — both live
-   in the bottom-right corner, and an advert notice covering the only way out
-   of fullscreen would be a poor trade. */
+/* Keep the notice above YouTube's native transport bar. */
 .ad-note {
   position: absolute;
-  right: clamp(58px, 1.4vw + 46px, 72px);
-  bottom: clamp(8px, 1.4vw, 22px);
+  right: 12px;
+  bottom: 56px;
   z-index: 4;
   display: flex;
   align-items: center;
