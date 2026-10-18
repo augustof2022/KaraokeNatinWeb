@@ -251,6 +251,30 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01e
 .choice h2 { margin: 0 0 4px; font-size: 21px; }
 .choice p { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; }
 
+.youtube-account {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.youtube-account summary { cursor: pointer; color: var(--ink-2); font-size: 13px; font-weight: 600; }
+.youtube-account[open] summary { margin-bottom: 12px; }
+.youtube-account p { margin: 0 0 12px; color: var(--ink-2); font-size: 13px; line-height: 1.55; }
+.youtube-account-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.youtube-account-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  height: auto;
+  padding: 10px 12px;
+  font-size: 13px;
+  white-space: normal;
+  text-align: center;
+}
+.youtube-account-actions a { text-decoration: none; }
+
 .join-form { display: flex; flex-wrap: wrap; gap: 8px; }
 #join-name {
   flex: 1 1 100%;

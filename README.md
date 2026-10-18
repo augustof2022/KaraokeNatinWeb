@@ -70,6 +70,10 @@ The browser source comes from [nojukuramu’s web version](https://github.com/no
 See [`web/UPSTREAM.md`](web/UPSTREAM.md) for the imported revision and fork changes.
 The original public site remains at https://nojukuramu.github.io/karaokenatin/.
 
+Hosts can optionally open **YouTube account (optional)** on the home screen or in the room’s **Setup** tab.
+It opens YouTube in a new tab to sign in using the same browser profile. Sign-in can be skipped;
+Premium recognition inside the embedded player depends on YouTube and browser settings, so ad-free playback is not guaranteed.
+
 ## Publish your website
 
 1. Push this repository, including `web/` and `.github/workflows/pages.yml`, to the fork’s `main` branch.

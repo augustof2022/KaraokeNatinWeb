@@ -17,6 +17,7 @@ Fork changes:
 - Deploy the browser app at https://augustof2022.github.io/KaraokeNatinWeb/.
 - Link the app's source footer and documentation to this fork.
 - Use a relative PWA manifest identity so installation uses this site's path.
+- Add optional host YouTube sign-in guidance without changing account or playback handling.
 - Publish only static runtime assets through `.github/workflows/pages.yml`.
 
 The upstream browser code and the native app have separate implementations.

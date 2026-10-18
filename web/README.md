@@ -349,10 +349,19 @@ seconds and concluding the app has hung.
 There is no flag to read for that, so it is inferred: an advert makes the player's reported
 duration disagree wildly with the duration the search mirror gave for the song. It is a
 heuristic and it is used for exactly one thing, a label. Nothing skips, scores or advances
-on the strength of it, so being wrong costs a caption rather than somebody's turn. The
-Setup tab says all of this in as many words, and points at the only two things that
-actually remove adverts — a browser-level blocker or a Premium account on the host screen,
-both of which are the host's own choice to make.
+on the strength of it, so being wrong costs a caption rather than somebody's turn. The Setup tab explains how ads work.
+
+The host can open **YouTube account (optional)** in the home Host card or the room’s
+**Setup** tab. **Open YouTube to sign in** opens YouTube in a separate tab; sign in
+there using the same host device, browser, and browser profile, then return to karaoke.
+The setup panel can be skipped, and hosting works without a YouTube account.
+
+Signing in alone does not remove ads. Premium may apply if YouTube recognizes the
+host’s signed-in browser session, but browser privacy settings and YouTube determine
+whether that session is available to the embedded player. Ad-free playback is not
+guaranteed. KaraokeNatin cannot read your YouTube login, verify Premium, or force an
+account onto the player. Being signed in to a separate YouTube app or a guest’s phone
+does not sign in the host’s browser.
 
 ## Statistics
 
@@ -484,6 +493,7 @@ Individual checks below run from `web/` after installing the test runner:
 
 ```bash
 node tools/qr-test.js         # QR conformance: module counts, block layouts, capacities
+node tools/youtube-setup-e2e.js # optional account guidance, safe popup, skip, room restore
 node tools/e2e.js             # two real browsers, one real WebRTC link (needs playwright)
 node tools/reconnect-e2e.js   # leaving the browser and coming back           (playwright)
 node tools/player-e2e.js      # playback state machine against a mock player  (playwright)

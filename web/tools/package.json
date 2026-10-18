@@ -2,7 +2,7 @@
   "name": "karaokenatin-web-checks",
   "private": true,
   "scripts": {
-    "test": "node version-check.js && node qr-test.js && node install-e2e.js && node e2e.js && node player-e2e.js"
+    "test": "node version-check.js && node qr-test.js && node youtube-setup-e2e.js && node install-e2e.js && node e2e.js && node player-e2e.js"
   },
   "devDependencies": {
     "playwright": "1.62.1"

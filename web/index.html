@@ -31,7 +31,7 @@
       } catch (e) { /* private mode — fall back to the system preference */ }
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=2.6.1" />
+  <link rel="stylesheet" href="css/app.css?v=2.6.2" />
 </head>
 
 <body>
@@ -83,6 +83,20 @@
           <h2>Host</h2>
           <p>Open this on the big screen.</p>
           <button id="host-btn" class="btn btn-primary btn-big">Start a room</button>
+          <details id="youtube-setup-home" class="youtube-account">
+            <summary>YouTube account (optional)</summary>
+            <p>Have YouTube Premium? Open YouTube on this host device and sign in using
+              the same browser profile, then return to this tab.</p>
+            <p>Premium only applies if YouTube recognizes your signed-in session.
+              Browser settings may prevent this, so ad-free playback is not guaranteed.
+              KaraokeNatin cannot check your account or Premium status.</p>
+            <p>Already signed in, or don’t have Premium? Skip this and use karaoke as usual.</p>
+            <div class="youtube-account-actions">
+              <a class="btn btn-ghost youtube-sign-in" href="https://www.youtube.com/"
+                 target="_blank" rel="noopener noreferrer">Open YouTube to sign in</a>
+              <button type="button" class="btn btn-quiet" data-youtube-skip>Skip for now</button>
+            </div>
+          </details>
         </div>
 
         <div class="choice">
@@ -681,6 +695,20 @@
           <!-- configuration (host and co-hosts) -->
           <div class="panel" data-panel="config" hidden>
             <div class="config">
+              <details id="youtube-setup-room" class="youtube-account host-only">
+                <summary>YouTube account (optional)</summary>
+                <p>Have YouTube Premium? Open YouTube on this host device and sign in using
+                  the same browser profile, then return to this tab.</p>
+                <p>Premium only applies if YouTube recognizes your signed-in session.
+                  Browser settings may prevent this, so ad-free playback is not guaranteed.
+                  KaraokeNatin cannot check your account or Premium status.</p>
+                <p>Already signed in, or don’t have Premium? Skip this and use karaoke as usual.</p>
+                <div class="youtube-account-actions">
+                  <a class="btn btn-ghost youtube-sign-in" href="https://www.youtube.com/"
+                     target="_blank" rel="noopener noreferrer">Open YouTube to sign in</a>
+                  <button type="button" class="btn btn-quiet" data-youtube-skip>Skip for now</button>
+                </div>
+              </details>
               <label class="cfg">
                 <input type="checkbox" id="cfg-scoring" />
                 <span class="cfg-text">
@@ -719,12 +747,11 @@
               </label>
               <p class="side-note">Only the host and co-hosts can change these.</p>
               <p class="side-note">
-                <strong>Adverts.</strong> YouTube serves them inside its own player and no
-                page may skip, click, or hide one — doing it would break their terms and
-                take the video down with it. The room labels an advert while it runs so
-                nobody thinks the app has hung. A browser-level ad blocker or a YouTube
-                Premium account on the host screen is the only thing that actually removes
-                them, and both are the host's own choice to make.
+                <strong>Adverts.</strong> YouTube controls ads inside its player; KaraokeNatin
+                cannot turn them off. The room labels an advert while it runs so nobody
+                thinks the app has hung. Signing in alone does not remove ads. Premium may
+                apply when YouTube recognizes the host browser’s session, but it is not
+                guaranteed in an embedded player.
               </p>
             </div>
           </div>
@@ -757,18 +784,18 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script src="js/icons.js?v=2.6.1"></script>
-  <script src="js/sound.js?v=2.6.1"></script>
-  <script src="js/fx.js?v=2.6.1"></script>
-  <script src="js/stats.js?v=2.6.1"></script>
-  <script src="js/games.js?v=2.6.1"></script>
-  <script src="js/qr.js?v=2.6.1"></script>
-  <script src="js/peer.js?v=2.6.1"></script>
-  <script src="js/search.js?v=2.6.1"></script>
-  <script src="js/library.js?v=2.6.1"></script>
-  <script src="js/room.js?v=2.6.1"></script>
-  <script src="js/player.js?v=2.6.1"></script>
-  <script src="js/embed.js?v=2.6.1"></script>
-  <script src="js/app.js?v=2.6.1"></script>
+  <script src="js/icons.js?v=2.6.2"></script>
+  <script src="js/sound.js?v=2.6.2"></script>
+  <script src="js/fx.js?v=2.6.2"></script>
+  <script src="js/stats.js?v=2.6.2"></script>
+  <script src="js/games.js?v=2.6.2"></script>
+  <script src="js/qr.js?v=2.6.2"></script>
+  <script src="js/peer.js?v=2.6.2"></script>
+  <script src="js/search.js?v=2.6.2"></script>
+  <script src="js/library.js?v=2.6.2"></script>
+  <script src="js/room.js?v=2.6.2"></script>
+  <script src="js/player.js?v=2.6.2"></script>
+  <script src="js/embed.js?v=2.6.2"></script>
+  <script src="js/app.js?v=2.6.2"></script>
 </body>
 </html>

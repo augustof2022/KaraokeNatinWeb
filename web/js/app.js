@@ -3219,7 +3219,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.1";
+  var APP_VERSION = "2.6.2";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;
@@ -3433,6 +3433,18 @@
       closeNameGate();
       location.hash = "#/";
       showHome();
+    });
+  }
+
+  // Account setup is an optional shortcut to YouTube, never a room prerequisite.
+  // We cannot detect a YouTube login or attach an account to the embedded player.
+  function setupYouTubeAccount() {
+    $$("[data-youtube-skip]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var panel = button.closest("details");
+        panel.open = false;
+        panel.querySelector("summary").focus();
+      });
     });
   }
 
@@ -3810,6 +3822,7 @@
     if (KN.sound) KN.sound.arm();
     setupTheme();
     setupNameGate();
+    setupYouTubeAccount();
     setupUpdateUI();
     switchTab("queue");
     startLocalClock();
