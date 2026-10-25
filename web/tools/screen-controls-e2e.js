@@ -92,8 +92,11 @@ async function main() {
     await page.waitForSelector("#stage-controls:not(.stage-controls-hidden)");
     console.log("  ok   touching the screen reveals controls");
     await page.evaluate(() => { document.body.classList.add("stage-fullscreen"); KN.app.player.pause(); });
+    const fullscreenStage = await page.locator("#stage").boundingBox();
     const join = await page.locator("#fs-join").boundingBox();
-    assert.ok(join && join.y < stage.y + stage.height / 2 && join.x > stage.x + stage.width / 2, "room QR stays at the top right");
+    assert.ok(join && join.x > fullscreenStage.x + fullscreenStage.width / 2, "room QR stays on the right");
+    assert.ok(join.y >= fullscreenStage.y + 80, "QR clears the top YouTube menu row");
+    assert.ok(join.y + join.height <= fullscreenStage.y + fullscreenStage.height, "QR remains inside the screen");
     assert.equal(await page.locator("#fs-join").evaluate((n) => getComputedStyle(n).pointerEvents), "none");
     assert.equal(await page.locator("#fs-join").evaluate((n) => { const r=n.getBoundingClientRect(); return n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), false, "QR does not intercept player clicks");
     assert.equal(await page.locator("#qr-fs").isVisible(), true);
@@ -103,7 +106,10 @@ async function main() {
     assert.ok(mobile.x >= 0 && mobile.x + mobile.width <= 390, "mobile overlay fits horizontally");
     assert.equal(await page.locator("#qr-fs").isVisible(), true);
     assert.equal(await page.locator("#play-btn").isVisible(), true);
-    console.log("  ok   QR stays at the top right without blocking clicks; bottom controls fit mobile");
+    const mobileStage = await page.locator("#stage").boundingBox();
+    const mobileJoin = await page.locator("#fs-join").boundingBox();
+    assert.ok(mobileJoin.y >= mobileStage.y + 80, "mobile QR also clears the top menu row");
+    console.log("  ok   QR sits below the top menu icons without blocking clicks; bottom controls fit mobile");
     await page.evaluate(() => { document.body.classList.remove("stage-fullscreen"); KN.app.player.play(); });
     await page.click("#leave-btn"); await page.click("#leave-room-close");
     await page.waitForSelector("#view-home:not([hidden])");

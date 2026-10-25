@@ -716,7 +716,9 @@ body.is-host .pill.host-only { display: inline-flex; }
 .fs-join {
   display: none;
   position: absolute;
-  top: clamp(8px, 1vw, 18px);
+  /* Reserve YouTube's top menu row so its icons stay visible, not merely
+   * clickable through the QR. Keep the badge below device safe areas too. */
+  top: calc(80px + env(safe-area-inset-top, 0px));
   right: clamp(8px, 1vw, 18px);
   z-index: 4;
   pointer-events: none;

@@ -115,9 +115,10 @@ Host playback controls and the fullscreen toggle share a bottom overlay.
 Pointer movement, a tap/click, or keyboard focus reveals it;
 it hides after three seconds of inactivity while playing and stays visible while
 paused or loading. Keyboard-focused controls and active slider drags stay visible.
-The fullscreen QR stays visible at the top right and allows clicks and taps through
-to the player beneath it. YouTube controls the location of its own quality/settings
-menu; the app cannot move that cross-origin menu.
+The fullscreen QR stays visible on the right, 80 pixels below the top edge (plus
+the device safe area), leaving YouTube's top menu icons visible. It allows clicks
+and taps through to the player beneath it. YouTube controls the location of its
+own quality/settings menu; the app cannot move that cross-origin menu.
 Keep the host tab in the foreground. If it still pauses, compare the same video
 directly on YouTube on the same device, browser profile, and quality setting.
 
@@ -438,8 +439,8 @@ is a button at the bottom that erases the lot.
   the stage names what is coming and who queued it, then goes away after a few seconds. It
   exists so the next singer stands up, not so the room stops watching the one still going —
   and it never runs while an advert is playing, since an advert's clock is not the song's.
-- **Fullscreen join badge.** The QR and room code stay together at the top right,
-  including when the bottom playback controls hide. The badge does not intercept
+- **Fullscreen join badge.** The QR and room code stay together on the right below
+  YouTube's top menu row, including when the bottom playback controls hide. The badge does not intercept
   clicks or taps on YouTube controls beneath it.
 - **Dragging the queue.** Every row has a grab rail. Everyone tries to drag a queue, and one
   that does not move reads as broken rather than as a list with buttons. It is pointer
