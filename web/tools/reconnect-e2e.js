@@ -178,6 +178,14 @@ async function main() {
   await host.waitForFunction(() => document.querySelector("#guest-count").textContent === "1", null, { timeout: 20000 });
   check("host counts the returning guest exactly once", true);
 
+  const approvedId = await guest.evaluate(() => window.KN.app.clientId);
+  await guest.reload();
+  await guest.waitForSelector("#conn.conn-ok", { timeout: 45000 });
+  await guest.waitForFunction(() => window.KN.app.state && !window.KN.app.waiting &&
+    (window.KN.app.state.guests || []).some((g) => g.id === window.KN.app.clientId), null, { timeout: 20000 });
+  check("guest reload preserves its approved identity", await guest.evaluate(() => window.KN.app.clientId) === approvedId);
+  check("guest reload needs no new name confirmation", !(await guest.locator("#name-gate").isVisible()));
+
   /* ── 2. a flurry of wake-ups must not become a flurry of attempts ─────────
    * Every visibility change, every focus, every network event used to start a
    * fresh attempt without cancelling the one already scheduled — all sharing

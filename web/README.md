@@ -60,7 +60,11 @@ Room connections are the part that actually breaks in the wild, so redundancy is
 - **Queued commands.** Anything you tap while offline is held and flushed when the channel
   reopens.
 - **Session resume.** The host's room code, token, and queue survive a reload; guests are
-  offered a rejoin. Reopening the same code puts everyone back in the same room.
+  restored with the same identity and prior host approval. Reopening the site or the same
+  room link resumes the saved session automatically, within the 12-hour resume window.
+  Explicitly leaving, closing the room, or being removed clears the saved session.
+  On browsers with Web Locks, a second live tab gets its own identity instead of
+  repeatedly replacing the first tab's connection.
 
 ### Coming back
 
@@ -73,23 +77,29 @@ page believed about its connection was frozen along with it, so none of it can b
   signal iOS Safari gives), and a clock-gap check for the case none of those fire at all — a
   laptop that slept with this tab in front, where the page never lost focus and every timer in
   it simply stopped. Both roles listen: a host nobody can find is as dead as a guest.
-- **Ask, don't assume.** A channel that claims to be open is probed on wake, and rebuilt at
-  once if it does not answer — rather than waiting out a silence timer that was not running
-  anyway. The same silence measured *across* a freeze proves nothing, so it never kills a link
-  that was fine.
+- **Allow time to wake.** Wake events share a liveness probe with a ten-second reply window.
+  A missing reply alone does not destroy an open channel; a foreground page allows a full
+  minute of silence before rebuilding it. A timer gap across a freeze resets that grace
+  period, and a transient ICE disconnect gets twenty seconds to recover.
 - **One attempt at a time.** Reconnection is a single supervised attempt guarded by a
   generation counter, with every timer owned and cancellable. Wake-ups used to each start a
   fresh attempt without cancelling the one already scheduled — all sharing one connection id,
   so each new attempt made the host discard the previous link, whose close scheduled another
   attempt. A phone picked up twice could sit there retrying forever.
+  Recent handshakes now survive wake-event bursts, duplicate offers reuse the same answer,
+  and callbacks and ICE candidates from older negotiations cannot replace the current one.
 - **A stale id is not a lost room.** A broker holds a peer id for a while after the socket
   behind it dies, so a host that reconnects quickly is told its own room code is taken. It
-  waits that out with the same token instead of believing it, and only surrenders the code
-  after every broker has said so several times over. Renaming the room strands every guest
-  holding the old one.
+  waits that out with the same token and never silently renames the room. Existing data
+  channels remain usable while invitation brokers reconnect; the host badge says so.
 - **The host cleans up after itself.** On wake it re-registers, proves each guest link, and
   re-broadcasts the room — so the guest list is not full of people who left during the nap,
   and everyone still there is looking at the same queue.
+
+Browsers can suspend background tabs and stop closed pages completely. This app retains
+membership and reconnects when the page runs again; it cannot keep a stopped browser
+connected. Keep the host tab open on the host screen. Continuing playback and serving a
+room while the host browser is closed would require an always-running backend.
 
 ## Playback performance and buffering
 
@@ -101,6 +111,13 @@ YouTube’s own player controls are available on the video. If playback buffers,
 open its settings menu and try **Quality → 480p or 360p**, when that menu is
 available. The app does not force a resolution; YouTube controls quality selection.
 Use the room’s fullscreen button to retain the join QR code and score overlays.
+Host playback controls and the fullscreen toggle share a bottom overlay.
+Pointer movement, a tap/click, or keyboard focus reveals it;
+it hides after three seconds of inactivity while playing and stays visible while
+paused or loading. Keyboard-focused controls and active slider drags stay visible.
+The fullscreen QR stays visible at the top right and allows clicks and taps through
+to the player beneath it. YouTube controls the location of its own quality/settings
+menu; the app cannot move that cross-origin menu.
 Keep the host tab in the foreground. If it still pauses, compare the same video
 directly on YouTube on the same device, browser profile, and quality setting.
 
@@ -377,10 +394,14 @@ duration disagree wildly with the duration the search mirror gave for the song. 
 heuristic and it is used for exactly one thing, a label. Nothing skips, scores or advances
 on the strength of it, so being wrong costs a caption rather than somebody's turn. The Setup tab explains how ads work.
 
-The host can open **YouTube account (optional)** in the home Host card or the room’s
-**Setup** tab. **Open YouTube to sign in** opens YouTube in a separate tab; sign in
-there using the same host device, browser, and browser profile, then return to karaoke.
-The setup panel can be skipped, and hosting works without a YouTube account.
+Choose **Host with YouTube account** to open the optional setup panel. **Open YouTube
+to sign in** opens YouTube in a separate tab; sign in there using the same host device,
+browser, and browser profile, then return and choose **Continue to host**. The panel is
+also available in the room's **Setup** tab.
+
+**Host without signing in** starts immediately. It uses the browser's current YouTube
+session; it does not log out an account already signed in. For YouTube guest playback,
+use a separate signed-out browser profile. Room guests do not need Google accounts.
 
 Signing in alone does not remove ads. Premium may apply if YouTube recognizes the
 host’s signed-in browser session, but browser privacy settings and YouTube determine
@@ -417,10 +438,9 @@ is a button at the bottom that erases the lot.
   the stage names what is coming and who queued it, then goes away after a few seconds. It
   exists so the next singer stands up, not so the room stops watching the one still going —
   and it never runs while an advert is playing, since an advert's clock is not the song's.
-- **Fullscreen join badge.** The QR and the room code used to sit in opposite corners, which
-  spent two corners of a television saying one thing twice. Stacked into one badge in the top
-  right, the code reads as the caption to the thing you point a camera at, and anyone who
-  cannot resolve the modules from across the room can still type it.
+- **Fullscreen join badge.** The QR and room code stay together at the top right,
+  including when the bottom playback controls hide. The badge does not intercept
+  clicks or taps on YouTube controls beneath it.
 - **Dragging the queue.** Every row has a grab rail. Everyone tries to drag a queue, and one
   that does not move reads as broken rather than as a list with buttons. It is pointer
   events rather than HTML5 drag-and-drop, because the queue that most needs reordering is
@@ -520,6 +540,9 @@ Individual checks below run from `web/` after installing the test runner:
 ```bash
 node tools/qr-test.js         # QR conformance: module counts, block layouts, capacities
 node tools/player-controls-test.js # quality controls, sound readback, buffering events
+node tools/peer-recovery-test.js # wake/offer/answer races, broker conflicts (no browser)
+node tools/session-recovery-e2e.js # browser resume, identity, explicit leave (stand-in transport)
+node tools/screen-controls-e2e.js # bottom overlay, auto-hide, pause, touch and keyboard behavior
 node tools/playback-performance-e2e.js # progress without rebuilding the room or rewriting storage
 node tools/leave-room-e2e.js  # app confirmation, room teardown, delayed player setup
 node tools/youtube-setup-e2e.js # optional account guidance, safe popup, skip, room restore

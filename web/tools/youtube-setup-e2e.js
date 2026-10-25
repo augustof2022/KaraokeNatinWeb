@@ -142,10 +142,15 @@ async function main() {
       check(label + " guidance creates no YouTube iframe or room", await page.evaluate(() =>
         document.querySelectorAll("iframe").length === 0 && window.KN.app.role === null));
 
-      await page.click("#host-btn");
+      await page.click("#host-youtube-btn");
+      check(label + " account hosting opens the sign-in guidance", await page.locator("#youtube-setup-home").evaluate((node) => node.open));
+      check(label + " account hosting focuses the YouTube shortcut", await page.locator("#youtube-setup-home .youtube-sign-in").evaluate((node) => document.activeElement === node));
+      check(label + " explains signed-out playback without pretending to log out", /separate signed-out browser profile/i.test(await page.locator("#youtube-setup-home").innerText()));
+
+      await page.click(label === "desktop" ? "#host-btn" : "#host-account-continue");
       await page.waitForSelector("#view-room:not([hidden])");
       const code = (await page.textContent("#room-code")).trim();
-      check(label + " starts a room after skipping sign-in", /^[A-Z0-9]{6}$/.test(code));
+      check(label + " starts a room through the selected hosting path", /^[A-Z0-9]{6}$/.test(code));
       await page.click('[data-tab="config"]');
       const beforeSkip = await roomSnapshot(page);
       await checkPanel(page, "#youtube-setup-room", label + " host room", false);

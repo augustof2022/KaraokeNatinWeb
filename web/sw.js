@@ -25,7 +25,7 @@
 var VERSION = "kn-v11";
 
 /* Matches APP_VERSION in js/app.js and the ?v= in index.html. */
-var ASSET_V = "2.6.4";
+var ASSET_V = "2.6.6";
 var SHELL = VERSION + "-shell";
 
 var SHELL_FILES = [

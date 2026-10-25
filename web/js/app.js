@@ -193,15 +193,6 @@
           refreshGuestList();
           broadcastState({ progress: true });
           render();
-        },
-        "code-taken": function () {
-          if (!currentRoom()) return;
-          // Every broker says the id is in use, so someone else really is on
-          // this code. Move rather than fight over it — but keep the queue.
-          toast("That room code was taken — switching to a new one.", "warn");
-          var carry = { queue: app.state.queue, now: app.state.now, at: Date.now() };
-          app.net.stop();
-          startHost(KN.net.makeCode(), carry);
         }
       }
     });
@@ -1387,31 +1378,49 @@
   /* ================= GUEST ================= */
 
   function startGuest(code) {
+    var saved = load(STORE.guest);
+    var identity = saved && saved.code === code ? saved.connectionId : null;
+    try { identity = sessionStorage.getItem("kn:guest:identity:" + code) || identity; } catch (e) { /* storage unavailable */ }
     app.role = "guest";
     app.state = R.createState(code);
     app.name = app.name || loadName() || "";
 
-    app.net = KN.net.join(code, {
+    var room = app.state;
+    var net;
+    function currentRoom() { return app.role === "guest" && app.net === net; }
+    net = KN.net.join(code, {
       state: function (s, detail) {
+        if (app.role !== "guest" || (app.net !== net && app.state !== room)) return;
         app.connection = s;
         renderConnection(detail);
       },
       open: function () {
+        if (!currentRoom()) return;
+        persistGuest();
         app.net.send({ type: CMD.HELLO, name: app.name || "Guest" });
         app.net.send({ type: CMD.RESYNC });
       },
-      message: function (data) { onHostMessage(data); },
-      closed: function () { renderConnection(); },
+      message: function (data) { if (currentRoom()) onHostMessage(data); },
+      closed: function () { if (currentRoom()) renderConnection(); },
       wake: function () {
+        if (!currentRoom()) return;
         // The channel proved itself alive, but it was deaf while we were away.
         app.net.send({ type: CMD.HELLO, name: app.name || "Guest" });
         app.net.send({ type: CMD.RESYNC });
+        persistGuest();
       }
-    });
+    }, { connectionId: identity });
+    app.net = net;
 
-    save(STORE.guest, { at: Date.now(), code: code });
+    persistGuest();
     if (KN.stats) KN.stats.startSession({ code: code, role: "guest" });
     showRoom();
+  }
+
+  function persistGuest() {
+    if (app.role !== "guest" || !app.state || !app.net) return;
+    save(STORE.guest, { at: Date.now(), code: app.state.code, connectionId: app.net.connectionId });
+    try { sessionStorage.setItem("kn:guest:identity:" + app.state.code, app.net.connectionId); } catch (e) { /* storage unavailable */ }
   }
 
   function onHostMessage(data) {
@@ -1424,6 +1433,10 @@
         // Snapshots are authoritative; an out-of-order straggler is dropped.
         if (app.state && data.rev < app.state.rev) return;
         app.state = data.state;
+        // Refresh the resume window without writing storage on every progress
+        // snapshot. The opaque identity preserves the host's prior approval.
+        var saved = load(STORE.guest);
+        if (!saved || Date.now() - saved.at > 60000) persistGuest();
         app.waiting = !!app.state.lobby;
         if (KN.sound) KN.sound.setEnabled(!app.state.config || app.state.config.sounds !== false);
         // A guest has no stage to put the score on, so it arrives as a toast —
@@ -1499,6 +1512,9 @@
 
   function leave() {
     var net = app.net;
+    if (app.role === "guest" && app.state) {
+      try { sessionStorage.removeItem("kn:guest:identity:" + app.state.code); } catch (e) { /* storage unavailable */ }
+    }
     playerGeneration++;
     closeLeaveConfirmation(false);
     if (app.role === "host") {
@@ -1772,6 +1788,70 @@
     btn.title = on ? "Exit fullscreen" : "Fullscreen";
     btn.setAttribute("aria-label", btn.title);
     btn.setAttribute("aria-pressed", String(on));
+    showStageControls();
+  }
+
+  var stageControlsTimer = null;
+  var stageControlsStatus = null;
+  var stageControlsKeyboard = false;
+  var stageControlsPressed = false;
+
+  function setStageControlsHidden(hidden) {
+    var controls = $("#stage-controls");
+    controls.classList.toggle("stage-controls-hidden", hidden);
+    controls.inert = hidden;
+    controls.setAttribute("aria-hidden", String(hidden));
+  }
+
+  function showStageControls() {
+    clearTimeout(stageControlsTimer);
+    stageControlsTimer = null;
+    setStageControlsHidden(false);
+    if (app.role !== "host" || !app.state || app.state.player.status !== "playing") return;
+    stageControlsTimer = setTimeout(function hide() {
+      stageControlsTimer = null;
+      var controls = $("#stage-controls");
+      // Never hide a keyboard user's focused control or interrupt a slider drag.
+      if (stageControlsPressed || (stageControlsKeyboard && controls.contains(document.activeElement))) return;
+      if (app.role === "host" && app.state && app.state.player.status === "playing") setStageControlsHidden(true);
+    }, 3000);
+  }
+
+  function syncStageControls() {
+    var transport = $("#transport");
+    var target = app.role === "host" ? $("#stage-transport-slot") : $("#transport-home");
+    if (transport.parentNode !== target) target.appendChild(transport);
+    var status = app.role === "host" && app.state ? app.state.player.status : null;
+    if (status !== stageControlsStatus) {
+      stageControlsStatus = status;
+      showStageControls();
+    }
+  }
+
+  function setupStageControls() {
+    var stage = $("#stage");
+    ["pointerenter", "pointermove", "click"].forEach(function (name) { stage.addEventListener(name, showStageControls); });
+    stage.addEventListener("pointerdown", function () { stageControlsPressed = true; stageControlsKeyboard = false; showStageControls(); });
+    global.addEventListener("pointerup", function () {
+      if (!stageControlsPressed) return;
+      stageControlsPressed = false;
+      showStageControls();
+    });
+    global.addEventListener("pointercancel", function () { stageControlsPressed = false; showStageControls(); });
+    stage.addEventListener("keydown", function () { stageControlsKeyboard = true; showStageControls(); });
+    stage.addEventListener("focusin", showStageControls);
+    stage.addEventListener("focusout", function () {
+      setTimeout(function () {
+        // Hiding an inert tray can itself blur a mouse-focused button. That
+        // must not reveal the tray again immediately after its timeout.
+        if (!$("#stage-controls").classList.contains("stage-controls-hidden")) showStageControls();
+      }, 0);
+    });
+    // Cross-origin iframe events do not bubble. Player pause/play events still
+    // update the overlay; entering the iframe by click also reveals it.
+    global.addEventListener("blur", function () {
+      if (stage.contains(document.activeElement)) showStageControls();
+    });
   }
 
   /* ---------------- screen: room ---------------- */
@@ -1860,7 +1940,7 @@
       retrying: ["warn", "reconnecting…"],
       stopped: ["bad", "left"],
       hosting: ["ok", "hosting"],
-      unlisted: ["warn", "reconnecting…"]
+      unlisted: ["warn", "hosting · invites reconnecting…"]
     };
     var e = map[app.connection] || ["bad", app.connection];
     badge.className = "conn conn-" + e[0];
@@ -1884,6 +1964,7 @@
     renderScores();
     renderGames();
     renderConfig();
+    syncStageControls();
 
     var s = app.state;
     $("#guest-count").textContent = String(s.guests.length);
@@ -3290,7 +3371,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.4";
+  var APP_VERSION = "2.6.6";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;
@@ -3451,12 +3532,9 @@
    * when someone lands straight on a join link from a QR code.
    */
 
-  /* The name is remembered, and the question is still asked. Those are two
-   * separate things and conflating them was the bug: someone who lent their
-   * phone to a friend, or is the friend, joined the room silently as whoever
-   * used it last, and only found out when the queue said so. Arriving at a
-   * room is exactly the moment to confirm — so the gate always opens, with
-   * the remembered name already typed into it and one tap to accept. */
+  /* Confirm the remembered name on a new join. Reloading an existing session
+   * restores it directly; asking again after every mobile tab discard would
+   * turn an ordinary recovery into a new arrival. */
   function enterRoom(code) {
     openNameGate(code);
   }
@@ -3510,6 +3588,11 @@
   // Account setup is an optional shortcut to YouTube, never a room prerequisite.
   // We cannot detect a YouTube login or attach an account to the embedded player.
   function setupYouTubeAccount() {
+    $("#host-youtube-btn").addEventListener("click", function () {
+      $("#youtube-setup-home").open = true;
+      $("#youtube-setup-home .youtube-sign-in").focus();
+    });
+    $("#host-account-continue").addEventListener("click", function () { $("#host-btn").click(); });
     $$("[data-youtube-skip]").forEach(function (button) {
       button.addEventListener("click", function () {
         var panel = button.closest("details");
@@ -3521,7 +3604,7 @@
 
   /* ---------------- routing ---------------- */
 
-  function route() {
+  function route(restore) {
     var hash = location.hash || "#/";
     var m = hash.match(/^#\/r\/([A-Za-z0-9]+)/);
 
@@ -3534,12 +3617,20 @@
       }
       if (app.role && app.state && app.state.code === code) return;
       if (app.pendingJoin === code) return;   // the name gate is already up for it
+      var owner = load(STORE.host);
+      if (!app.role && owner && owner.code === code) {
+        history.replaceState(null, "", "#/host");
+        startHost(code, owner);
+        return;
+      }
       if (app.role) {
         if (app.net) app.net.stop();
         if (app.player) app.player.destroy();
         clearInterval(ticker);
       }
-      enterRoom(code);
+      var returning = load(STORE.guest);
+      if (restore === true && returning && returning.code === code && loadName()) startGuest(code);
+      else enterRoom(code);
       return;
     }
     if (hash.indexOf("#/stats") === 0) {
@@ -3564,6 +3655,22 @@
       return;
     }
     if (app.role) return; // stay in the room; the room's Leave button routes out
+    // A discarded mobile tab can reopen at the site's root. Restore only on
+    // initial boot, so visiting Home deliberately never starts a room.
+    if (restore === true) {
+      var host = load(STORE.host);
+      var guest = load(STORE.guest);
+      if (host) {
+        history.replaceState(null, "", "#/host");
+        startHost(host.code, host);
+        return;
+      }
+      if (guest && loadName()) {
+        history.replaceState(null, "", "#/r/" + guest.code);
+        startGuest(guest.code);
+        return;
+      }
+    }
     showHome();
   }
 
@@ -3887,25 +3994,30 @@
     });
 
     global.addEventListener("hashchange", route);
-    global.addEventListener("beforeunload", function () {
+    function persistSession() {
       if (app.role === "host") persistHost();
+      if (app.role === "guest") persistGuest();
       // A room that ends because the tab did still had a length; record it
       // rather than leaving an open session growing forever.
       if (app.role && KN.stats) KN.stats.touchSession();
-    });
+    }
+    global.addEventListener("beforeunload", persistSession);
+    global.addEventListener("pagehide", persistSession);
+    document.addEventListener("visibilitychange", function () { if (document.hidden) persistSession(); });
 
     paintIcons();
     if (KN.sound) KN.sound.arm();
     setupTheme();
     setupNameGate();
     setupLeaveConfirmation();
+    setupStageControls();
     setupYouTubeAccount();
     setupUpdateUI();
     switchTab("queue");
     startLocalClock();
     startCurfewWatch();
     setupInstall();
-    route();
+    route(true);
   }
 
   /* The host ticks off the real player position; a guest only hears about it

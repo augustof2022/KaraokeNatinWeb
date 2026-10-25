@@ -31,7 +31,7 @@
       } catch (e) { /* private mode — fall back to the system preference */ }
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=2.6.4" />
+  <link rel="stylesheet" href="css/app.css?v=2.6.6" />
 </head>
 
 <body>
@@ -82,7 +82,9 @@
         <div class="choice choice-host">
           <h2>Host</h2>
           <p>Open this on the big screen.</p>
-          <button id="host-btn" class="btn btn-primary btn-big">Start a room</button>
+          <button id="host-youtube-btn" class="btn btn-primary btn-big" aria-controls="youtube-setup-home">Host with YouTube account</button>
+          <button id="host-btn" class="btn btn-ghost btn-big">Host without signing in</button>
+          <p>No account required. Playback uses this browser’s YouTube session.</p>
           <details id="youtube-setup-home" class="youtube-account">
             <summary>YouTube account (optional)</summary>
             <p>Have YouTube Premium? Open YouTube on this host device and sign in using
@@ -90,10 +92,12 @@
             <p>Premium only applies if YouTube recognizes your signed-in session.
               Browser settings may prevent this, so ad-free playback is not guaranteed.
               KaraokeNatin cannot check your account or Premium status.</p>
-            <p>Already signed in, or don’t have Premium? Skip this and use karaoke as usual.</p>
+            <p>To play as a YouTube guest, use a separate signed-out browser profile.
+              Skipping sign-in here does not sign you out of YouTube.</p>
             <div class="youtube-account-actions">
               <a class="btn btn-ghost youtube-sign-in" href="https://www.youtube.com/"
                  target="_blank" rel="noopener noreferrer">Open YouTube to sign in</a>
+              <button id="host-account-continue" type="button" class="btn btn-primary">Continue to host</button>
               <button type="button" class="btn btn-quiet" data-youtube-skip>Skip for now</button>
             </div>
           </details>
@@ -489,7 +493,7 @@
     <div class="room-body">
       <div class="stage-col">
         <!-- host-only video stage -->
-        <div id="stage" class="stage host-only">
+        <div id="stage" class="stage host-only" tabindex="0" aria-label="Video screen. Focus or interact to show playback controls.">
           <div id="yt-mount" class="yt-mount">
             <button id="tap-to-play" class="tap-to-play" hidden>
               <span class="tap-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" class="i" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.2v13.6L19 12z" fill="currentColor" stroke-linejoin="round" /></svg></span>
@@ -564,21 +568,22 @@
 
           <div id="curfew" class="curfew" hidden><span id="curfew-text" class="curfew-text"></span></div>
 
-          <!-- Fullscreen hides the header and invite rail, so guests lose the
-               only copy of the join code/QR on screen. One badge in the top
-               right stands in for both: the code reads as a caption to the
-               code you point a camera at, which is what it is — and two
-               separate corners cost twice the screen for the same message. -->
+          <!-- The QR stays at the top right and lets clicks pass through to
+               any YouTube controls beneath it. Playback controls live below. -->
           <div id="fs-join" class="fs-join">
             <canvas id="qr-fs" class="fs-qr" aria-label="QR code with the join link"></canvas>
             <span id="room-code-4" class="fs-code"></span>
           </div>
+          <div id="stage-controls" class="stage-controls" role="group" aria-label="Screen controls">
+          <div id="stage-transport-slot" class="stage-transport-slot"></div>
           <button id="fs-btn" class="fs-btn" title="Fullscreen" aria-label="Toggle fullscreen"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" class="i" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.6A1.6 1.6 0 0 1 5.6 4H9" /><path d="M15 4h3.4A1.6 1.6 0 0 1 20 5.6V9" /><path d="M20 15v3.4a1.6 1.6 0 0 1-1.6 1.6H15" /><path d="M9 20H5.6A1.6 1.6 0 0 1 4 18.4V15" /></svg></button>
+          </div>
         </div>
 
         <div id="now" class="now"></div>
 
-        <div class="transport">
+        <div id="transport-home">
+        <div id="transport" class="transport">
           <div class="seekrow">
             <span id="t-now" class="t">0:00</span>
             <input id="seek" type="range" min="0" max="1" value="0" step="1" aria-label="Seek" />
@@ -593,6 +598,7 @@
               <input id="vol" type="range" min="0" max="100" value="80" aria-label="Volume" />
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -715,7 +721,8 @@
                 <p>Premium only applies if YouTube recognizes your signed-in session.
                   Browser settings may prevent this, so ad-free playback is not guaranteed.
                   KaraokeNatin cannot check your account or Premium status.</p>
-                <p>Already signed in, or don’t have Premium? Skip this and use karaoke as usual.</p>
+                <p>To play as a YouTube guest, use a separate signed-out browser profile.
+                  Skipping sign-in here does not sign you out of YouTube.</p>
                 <div class="youtube-account-actions">
                   <a class="btn btn-ghost youtube-sign-in" href="https://www.youtube.com/"
                      target="_blank" rel="noopener noreferrer">Open YouTube to sign in</a>
@@ -803,18 +810,18 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script src="js/icons.js?v=2.6.4"></script>
-  <script src="js/sound.js?v=2.6.4"></script>
-  <script src="js/fx.js?v=2.6.4"></script>
-  <script src="js/stats.js?v=2.6.4"></script>
-  <script src="js/games.js?v=2.6.4"></script>
-  <script src="js/qr.js?v=2.6.4"></script>
-  <script src="js/peer.js?v=2.6.4"></script>
-  <script src="js/search.js?v=2.6.4"></script>
-  <script src="js/library.js?v=2.6.4"></script>
-  <script src="js/room.js?v=2.6.4"></script>
-  <script src="js/player.js?v=2.6.4"></script>
-  <script src="js/embed.js?v=2.6.4"></script>
-  <script src="js/app.js?v=2.6.4"></script>
+  <script src="js/icons.js?v=2.6.6"></script>
+  <script src="js/sound.js?v=2.6.6"></script>
+  <script src="js/fx.js?v=2.6.6"></script>
+  <script src="js/stats.js?v=2.6.6"></script>
+  <script src="js/games.js?v=2.6.6"></script>
+  <script src="js/qr.js?v=2.6.6"></script>
+  <script src="js/peer.js?v=2.6.6"></script>
+  <script src="js/search.js?v=2.6.6"></script>
+  <script src="js/library.js?v=2.6.6"></script>
+  <script src="js/room.js?v=2.6.6"></script>
+  <script src="js/player.js?v=2.6.6"></script>
+  <script src="js/embed.js?v=2.6.6"></script>
+  <script src="js/app.js?v=2.6.6"></script>
 </body>
 </html>
