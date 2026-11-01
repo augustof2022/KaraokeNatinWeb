@@ -59,15 +59,14 @@
   };
 
   var HEARTBEAT_MS = 5000;        // broker keep-alive + data-channel ping
-  var SILENCE_MS = 20000;         // no traffic for this long => assume dead
-  var PROBE_MS = 2500;            // a wake-up probe waits this long for a pong
-  var ICE_GRACE_MS = 8000;        // "disconnected" often heals; give it a moment
+  var SILENCE_MS = 60000;         // allow background throttling and Wi-Fi handovers
+  var PROBE_MS = 10000;           // a returning phone may need time to resume
+  var ICE_GRACE_MS = 20000;       // "disconnected" often heals; give it a moment
   var OFFER_TIMEOUT_MS = 12000;   // per-attempt ceiling for reaching the host
   var ANSWER_OPEN_MS = 8000;      // answer accepted but channel never opened
   var SOCKET_STALE_MS = 25000;    // signalling socket idle this long => recycle
   var TIMESKIP_MS = 8000;         // clock jump that means the machine slept
   var SOFT_REOFFERS = 3;          // re-asks on one broker before moving on
-  var ID_TAKEN_ROUNDS = 3;        // sweeps before a host surrenders its code
 
   /* ---------------- small helpers ---------------- */
 
@@ -337,7 +336,8 @@
       if (closed) return;
       if (!ws || ws.readyState > 1) { self.retryNow(); return; }
       if (Date.now() - lastActivity > SOCKET_STALE_MS) { self.retryNow(); return; }
-      if (!self.open && !timer) self.retryNow();
+      // A recent WebSocket/PeerServer handshake is already doing the work.
+      // Repeated focus events must not keep replacing it before OPEN arrives.
     };
 
     self.send = function (type, dst, payload) {
@@ -378,6 +378,8 @@
     var interrupted = false;
     var pingSeq = 0;
     var probes = {};       // probe id -> resolve
+    var probing = null;
+    var received = 0;
 
     self.id = opts.connectionId;
     self.remote = opts.remote;
@@ -394,6 +396,7 @@
       dc.onerror = function () { /* onclose follows */ };
       dc.onmessage = function (ev) {
         lastSeen = Date.now();
+        received++;
         var data;
         try { data = JSON.parse(ev.data); } catch (e) { return; }
         if (data.t === "__ping") { self.raw({ t: "__pong", n: data.n }); return; }
@@ -412,30 +415,44 @@
      * (readyState, ICE state, time since last message) was frozen with it.
      */
     self.probe = function (ms) {
-      return new Promise(function (resolve) {
+      if (probing) return probing;
+      probing = new Promise(function (resolve) {
         if (dead || !self.isOpen()) return resolve(false);
         var n = "p" + (++pingSeq);
         var settled = false;
+        var timer = null;
         function finish(ok) {
           if (settled) return;
           settled = true;
           delete probes[n];
+          clearTimeout(timer);
           resolve(ok);
         }
         probes[n] = function () { finish(true); };
         if (!self.raw({ t: "__ping", n: n })) return finish(false);
-        var sentAt = Date.now();
-        setTimeout(function () {
+        var before = received;
+        timer = setTimeout(function () {
           // Any traffic at all counts as alive — a snapshot landing mid-probe
           // is better evidence than the pong we were waiting for.
-          finish(lastSeen > sentAt);
+          finish(received > before);
         }, ms || PROBE_MS);
+      });
+      probing.then(function () { probing = null; });
+      return probing;
+    };
+
+    // One missed probe is not a disconnect. A throttled remote page can still
+    // own an open channel; only rebuild after a full quiet interval.
+    self.recover = function () {
+      return self.probe(PROBE_MS).then(function (alive) {
+        if (!alive && !dead && !hidden() && Date.now() - lastSeen >= SILENCE_MS) self.destroy("stale");
+        return alive;
       });
     };
 
     /* A chained timeout rather than an interval, so the tick can see how long
-     * it was actually away. Twenty seconds of silence means death; twenty
-     * seconds of *not running* means nothing at all, and killing a good link
+     * it was actually away. A minute of foreground silence deserves a probe;
+     * time spent *not running* means nothing, and killing a good link
      * on that evidence is how a returning phone ends up rebuilding a channel
      * that was fine. */
     function startWatchdog() {
@@ -448,12 +465,10 @@
         last = now;
         if (gap > HEARTBEAT_MS * 4) {
           lastSeen = now;
-          self.probe(PROBE_MS).then(function (alive) {
-            if (!alive && !dead) self.destroy("stale");
-          });
+          self.recover();
         } else {
           self.raw({ t: "__ping", n: ++pingSeq });
-          if (now - lastSeen > SILENCE_MS) { self.destroy("timeout"); return; }
+          if (!hidden() && now - lastSeen > SILENCE_MS) self.recover();
         }
         watchdog = setTimeout(tick, HEARTBEAT_MS);
       }
@@ -609,8 +624,6 @@
     var links = {};          // connectionId -> Link
     var banned = {};         // connectionId -> true; kicked, and staying out
     var brokers = [];
-    var takenRounds = {};    // broker host -> consecutive ID-TAKEN answers
-    var surrendered = false;
     var stopped = false;
     var unwake = null;
 
@@ -623,25 +636,13 @@
       brokers.push(b);
 
       b.on("open", function () {
-        delete takenRounds[cfg.host];
         self.emit("broker", { host: cfg.host, up: true });
       });
       b.on("down", function () { self.emit("broker", { host: cfg.host, up: false }); });
-      b.on("id-taken", function (round) {
-        // One broker refusing the id is survivable — guests will find us on
-        // another — and the usual cause is our own socket from a moment ago,
-        // which the server has not reaped yet. The broker keeps retrying with
-        // the same token; only a clean sweep that survives several rounds
-        // means someone else really is on this code.
-        takenRounds[cfg.host] = round;
+      b.on("id-taken", function () {
+        // A broker conflict must never rename a running room and strand its
+        // guests. Keep retrying the saved code/token, including after sleep.
         self.emit("broker", { host: cfg.host, up: false });
-        var sweep = BROKERS.every(function (c) {
-          return (takenRounds[c.host] || 0) >= ID_TAKEN_ROUNDS;
-        });
-        if (sweep && !surrendered) {
-          surrendered = true;
-          self.emit("code-taken");
-        }
       });
       b.on("message", function (msg) { onSignal(b, msg); });
     });
@@ -654,6 +655,15 @@
       if (banned[cid]) return;   // kicked: their offers stop being interesting
 
       if (msg.type === "OFFER") {
+        if (!p.sdp || typeof p.sdp.sdp !== "string") return;
+        var existing = links[cid];
+        if (existing && existing.remote === msg.src && existing.offerSdp === p.sdp.sdp &&
+            existing.negotiationId === p.negotiationId) {
+          // Brokers can redeliver an OFFER, and guests resend it after a
+          // signalling reconnect. Reuse the answer; never destroy a good link.
+          if (existing.answer) broker.send("ANSWER", msg.src, existing.answer);
+          return;
+        }
         // A rejoining guest reuses its connection id. If the link we already
         // hold is genuinely alive the guest would not be re-offering, so the
         // old one goes — but quietly, as a replacement rather than a guest
@@ -669,9 +679,11 @@
           connectionId: cid,
           remote: msg.src,
           onCandidate: function (c) {
-            broker.send("CANDIDATE", msg.src, { candidate: c, connectionId: cid, type: "data" });
+            broker.send("CANDIDATE", msg.src, { candidate: c, connectionId: cid, negotiationId: p.negotiationId, type: "data" });
           }
         });
+        link.offerSdp = p.sdp.sdp;
+        link.negotiationId = p.negotiationId;
         links[cid] = link;
 
         link.on("open", function () { if (links[cid] === link) self.emit("guest-open", link); });
@@ -690,18 +702,22 @@
         link
           .acceptOffer(p.sdp)
           .then(function (answer) {
-            broker.send("ANSWER", msg.src, {
+            if (stopped || links[cid] !== link) return;
+            link.answer = {
               sdp: { type: answer.type, sdp: answer.sdp },
               connectionId: cid,
+              negotiationId: p.negotiationId,
               type: "data"
-            });
+            };
+            broker.send("ANSWER", msg.src, link.answer);
           })
           .catch(function (e) {
             console.warn("[kn] answer failed", e);
             link.destroy("answer-failed");
           });
       } else if (msg.type === "CANDIDATE") {
-        if (links[cid] && p.candidate) links[cid].addCandidate(p.candidate);
+        var current = links[cid];
+        if (current && current.remote === msg.src && current.negotiationId === p.negotiationId && p.candidate) current.addCandidate(p.candidate);
       }
     }
 
@@ -714,9 +730,7 @@
       brokers.forEach(function (b) { b.check(); });
       Object.keys(links).forEach(function (k) {
         var link = links[k];
-        link.probe(PROBE_MS).then(function (alive) {
-          if (!alive && links[k] === link) link.destroy("stale");
-        });
+        if (link.isOpen()) link.recover();
       });
       self.emit("wake");
     }
@@ -779,10 +793,11 @@
    * counter makes stale callbacks harmless, and every timer that could revive
    * an abandoned attempt is owned and cleared.
    */
-  function join(code, handlers) {
+  function join(code, handlers, opts) {
+    opts = opts || {};
     var self = emitter({});
     var target = peerIdFor(code);
-    var connectionId = "kn_" + rid(10);   // stable across reconnects
+    var connectionId = /^kn_[a-z0-9]{10,64}$/.test(opts.connectionId || "") ? opts.connectionId : "kn_" + rid(24);
     var gen = 0;
     var att = null;          // the one attempt in flight
     var retryTimer = null;
@@ -791,8 +806,13 @@
     var lastGood = 0;
     var stopped = false;
     var unwake = null;
+    var claimed = false;
+    var releaseIdentity = null;
+    var identityTimer = null;
+    var identityRetries = 0;
 
     self.code = normalizeCode(code);
+    self.connectionId = connectionId;
     self.state = "connecting";
 
     function setState(s, detail) {
@@ -817,14 +837,15 @@
 
     function armTimeout(a, ms) {
       clearTimeout(a.timer);
+      if (stopped || att !== a || a.gen !== gen || a.connected) return;
       a.timer = setTimeout(function () {
-        if (a.gen !== gen) return;
+        if (a.gen !== gen || a.connected || (a.link && a.link.isOpen())) return;
         fail("timeout");
       }, ms || OFFER_TIMEOUT_MS);
     }
 
     function startAttempt() {
-      if (stopped) return;
+      if (stopped || !claimed) return;
       clearTimeout(retryTimer);
       retryTimer = null;
       teardown();
@@ -841,7 +862,8 @@
         reoffers: 0,
         connected: false,
         timer: null,
-        soft: null
+        soft: null,
+        startedAt: Date.now()
       };
       att = a;
       setState("connecting", cfg.host);
@@ -867,14 +889,15 @@
         if (a.gen !== gen) return;
         var p = msg.payload || {};
         if (p.connectionId && p.connectionId !== connectionId) return;
+        if (p.negotiationId && p.negotiationId !== a.myId) return;
 
         if (msg.type === "ANSWER" && a.link) {
           // A duplicate answer to a re-offer would land on a settled peer
           // connection and throw; only the one we are still waiting for counts.
           if (a.link.signalingState() !== "have-local-offer") return;
           a.link.acceptAnswer(p.sdp).then(
-            function () { armTimeout(a, ANSWER_OPEN_MS); },
-            function () { fail("answer-rejected"); }
+            function () { if (att === a) armTimeout(a, ANSWER_OPEN_MS); },
+            function () { if (att === a) fail("answer-rejected"); }
           );
         } else if (msg.type === "CANDIDATE" && a.link) {
           if (p.candidate) a.link.addCandidate(p.candidate);
@@ -893,7 +916,7 @@
         connectionId: connectionId,
         remote: target,
         onCandidate: function (c) {
-          a.broker.send("CANDIDATE", target, { candidate: c, connectionId: connectionId, type: "data" });
+          a.broker.send("CANDIDATE", target, { candidate: c, connectionId: connectionId, negotiationId: a.myId, type: "data" });
         }
       });
       a.link = l;
@@ -944,6 +967,7 @@
       a.broker.send("OFFER", target, {
         sdp: a.offer,
         connectionId: connectionId,
+        negotiationId: a.myId,
         type: "data",
         label: "kn",
         reliable: true,
@@ -1011,17 +1035,19 @@
         self.emit("checking", reason);
         if (a.broker) a.broker.check();
         var l = a.link;
-        l.probe(PROBE_MS).then(function (alive) {
+        l.recover().then(function (alive) {
           if (stopped || att !== a || a.link !== l) return;
           if (alive) { self.emit("wake", reason); return; }
-          attempt = 0;
-          brokerIndex = lastGood;
-          l.destroy("stale");     // its close handler restarts us straight away
         });
         return;
       }
 
-      // Mid-handshake or waiting on a retry: neither deserves to survive a nap.
+      // Focus/online/visibility events arrive in bursts. Let a recent handshake
+      // finish; repeatedly replacing it can prevent the connection ever opening.
+      if (a && Date.now() - a.startedAt < OFFER_TIMEOUT_MS) {
+        if (a.broker) a.broker.check();
+        return;
+      }
       attempt = 0;
       brokerIndex = lastGood;
       startAttempt();
@@ -1036,6 +1062,7 @@
 
     self.retryNow = function () {
       if (stopped) return;
+      if (self.isOpen()) { onWake("retry"); return; }
       attempt = 0;
       brokerIndex = lastGood;
       startAttempt();
@@ -1046,9 +1073,11 @@
       stopped = true;
       gen++;
       clearTimeout(retryTimer);
+      clearTimeout(identityTimer);
       retryTimer = null;
       teardown();
       if (unwake) { unwake(); unwake = null; }
+      if (releaseIdentity) { releaseIdentity(); releaseIdentity = null; }
       setState("stopped");
     };
 
@@ -1056,7 +1085,44 @@
       Object.keys(handlers).forEach(function (k) { self.on(k, handlers[k]); });
     }
 
-    startAttempt();
+    function claimIdentity() {
+      if (stopped) return;
+      var locks = global.navigator && global.navigator.locks;
+      if (!locks) { claimed = true; startAttempt(); return; }
+      // A second tab must not reuse the first tab's saved identity: their
+      // offers would continually replace one another on the host. Web Locks
+      // are released by the browser when a document is discarded or closed.
+      locks.request("kn:guest:" + self.code + ":" + connectionId, { ifAvailable: true }, function (lock) {
+        if (stopped) return;
+        if (!lock) {
+          // The old document's lock can outlive its unload event briefly.
+          // Let a real reload reclaim it before treating this as a second tab.
+          if (identityRetries++ < 2) {
+            identityTimer = setTimeout(claimIdentity, 250);
+            return;
+          }
+          connectionId = "kn_" + rid(24);
+          self.connectionId = connectionId;
+          identityRetries = 0;
+          return claimIdentity();
+        }
+        return new Promise(function (resolve) {
+          releaseIdentity = resolve;
+          claimed = true;
+          startAttempt();
+        });
+      }).catch(function () {
+        if (stopped || claimed) return;
+        // If locks are denied, a fresh identity avoids colliding with another
+        // tab. Ordinary reloads retain identity where Web Locks are supported.
+        connectionId = "kn_" + rid(24);
+        self.connectionId = connectionId;
+        claimed = true;
+        startAttempt();
+      });
+    }
+
+    claimIdentity();
     unwake = wakeBus.on(onWake);
 
     return self;

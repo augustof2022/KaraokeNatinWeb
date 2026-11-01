@@ -84,6 +84,11 @@ async function main() {
     const before = await host.evaluate(() => JSON.stringify(window.__playerCalls));
     await host.evaluate(() => { window.__alice = window.__fakeJoin("alice", "Alice"); });
     await host.locator("#fs-pending:not([hidden])").waitFor();
+    const joinBox = await host.locator("#fs-join").boundingBox();
+    const pendingBox = await host.locator("#fs-pending").boundingBox();
+    const stageBox = await host.locator("#stage").boundingBox();
+    assert.ok(pendingBox.y >= joinBox.y + joinBox.height, "requests do not cover the QR code");
+    assert.ok(pendingBox.y + pendingBox.height <= stageBox.y + stageBox.height - 60, "requests leave the embedded controls clear");
     if (process.env.KN_SCREENSHOT_DIR) await host.screenshot({ path: path.join(process.env.KN_SCREENSHOT_DIR, "fullscreen-approvals.png") });
     assert.equal(await host.locator("#fs-pending-list").getByText("Alice").isVisible(), true);
     await host.frameLocator("#yt-frame").getByRole("button", { name: "YouTube control" }).click();

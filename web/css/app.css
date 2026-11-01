@@ -250,6 +250,8 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -0.01e
 .choice:hover { border-color: var(--line-2); box-shadow: var(--shadow); transform: translateY(-2px); }
 .choice h2 { margin: 0 0 4px; font-size: 21px; }
 .choice p { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; }
+.choice-host > .btn-big + .btn-big { margin-top: 10px; }
+.choice-host > .btn-big + p { margin: 12px 0 0; font-size: 13px; line-height: 1.5; }
 
 .youtube-account {
   margin: 16px 0 0;
@@ -640,14 +642,47 @@ body.is-host .pill.host-only { display: inline-flex; }
 .tap-text { font-size: 17px; font-weight: 600; font-family: var(--serif); }
 .tap-sub { font-size: 13px; color: #b6aed2; max-width: 34ch; }
 
-/* Always on screen, not on hover: the host screen is usually a TV or a tablet
- * that never sends a hover, and a control you cannot point at is a control
- * that is not there. It dims instead, and comes up to full on hover/focus. */
-.fs-btn {
+/* Keep app controls together below the picture's center, leaving YouTube's
+ * native bottom bar and quality menu reachable underneath. */
+.stage-controls {
+  --ink: #f4f0ff;
+  --ink-2: #d2cbe8;
+  --ink-3: #b6aed2;
+  --bg-3: #292338;
+  --bg-4: #49405d;
+  --line: rgba(255, 255, 255, 0.2);
   position: absolute;
+  bottom: 60px;
   left: 12px;
-  top: 12px; /* Keep the lower-right YouTube quality menu clear when open. */
-  z-index: 3;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(14, 9, 30, 0.88);
+  color: var(--ink);
+  transition: opacity 180ms ease, visibility 180ms;
+}
+.stage-controls-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.stage-transport-slot { flex: 1; min-width: 0; }
+.stage-controls .transport { padding: 0; border: 0; box-shadow: none; background: transparent; }
+#transport-home:empty { display: none; }
+.stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .stage-controls { left: 4px; right: 4px; bottom: 48px; padding: 8px; gap: 6px; }
+  .stage-controls .buttons { gap: 6px; margin-top: 4px; }
+  .stage-controls .icon-btn.big, .stage-controls .icon-btn.primary { min-width: 36px; height: 36px; }
+  .stage-controls .volgroup { min-width: 70px; gap: 4px; }
+  .stage-controls .seekrow { gap: 4px; }
+  .stage-controls .t { min-width: 34px; font-size: 11px; }
+  .stage-controls .fs-join { padding: 0; }
+}
+.fs-btn {
+  flex: none;
+  order: -1;
   background: rgba(14, 9, 30, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
@@ -657,10 +692,9 @@ body.is-host .pill.host-only { display: inline-flex; }
   cursor: pointer;
   display: grid;
   place-items: center;
-  opacity: 0.78;
   transition: opacity var(--mid) var(--ease), background var(--mid) var(--ease);
 }
-.stage:hover .fs-btn, .fs-btn:hover, .fs-btn:focus-visible {
+.fs-btn:hover, .fs-btn:focus-visible {
   opacity: 1;
   background: rgba(14, 9, 30, 0.85);
 }
@@ -682,9 +716,12 @@ body.is-host .pill.host-only { display: inline-flex; }
 .fs-join {
   display: none;
   position: absolute;
-  top: clamp(8px, 1vw, 18px);
+  /* Reserve YouTube's top menu row so its icons stay visible, not merely
+   * clickable through the QR. Keep the badge below device safe areas too. */
+  top: calc(80px + env(safe-area-inset-top, 0px));
   right: clamp(8px, 1vw, 18px);
   z-index: 4;
+  pointer-events: none;
   flex-direction: column;
   align-items: center;
   gap: 5px;
@@ -2461,21 +2498,33 @@ body.in-lobby .panels { opacity: 0.35; pointer-events: none; }
 /* Reconnection blocks guest room controls until a fresh host snapshot arrives. */
 .reconnect-backdrop { z-index: 100; }
 
-/* Pending guests stay visible and actionable inside the fullscreen stage. */
+/* Stack the QR and join requests without covering each other or the bottom bar. */
+.fs-sidebar { display: none; }
+body.stage-fullscreen .fs-sidebar {
+  position: absolute;
+  z-index: 5;
+  top: 80px;
+  top: calc(80px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  bottom: 175px;
+  width: 42vw;
+  max-width: 310px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.fs-sidebar .fs-join { position: static; flex: 0 0 auto; }
 .fs-pending { display: none; }
 body.stage-fullscreen .fs-pending:not([hidden]) {
   display: block;
-  position: absolute;
-  z-index: 5;
-  right: 12px;
-  top: 160px;
-  top: clamp(125px, 16vw, 250px);
-  max-height: 50%;
-  max-height: calc(100% - clamp(125px, 16vw, 250px) - 64px);
-  width: 42vw;
-  max-width: 310px;
-  width: min(310px, 42vw);
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  width: 100%;
+  margin-top: 8px;
   overflow-y: auto;
+  pointer-events: auto;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, .2);
   border-radius: 12px;
@@ -2489,6 +2538,7 @@ body.stage-fullscreen .fs-pending:not([hidden]) {
 .fs-pending-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .fs-pending-actions button { min-height: 40px; padding: 0 10px; font-size: clamp(14px, 1.2vw, 18px); }
 .fs-pending .btn-ghost { color: #fff; border-color: rgba(255, 255, 255, .4); }
+@media (max-height: 500px) { body.stage-fullscreen .fs-sidebar { bottom: 105px; } }
 
 /* This applies to the room UI, not YouTube's separate embedded document. */
 body.tv-performance *, body.tv-performance *::before, body.tv-performance *::after {
