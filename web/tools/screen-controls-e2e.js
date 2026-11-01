@@ -106,7 +106,14 @@ async function main() {
     assert.equal(await page.locator("#fs-join").evaluate((n) => getComputedStyle(n).pointerEvents), "none");
     assert.equal(await page.locator("#fs-join").evaluate((n) => { const r=n.getBoundingClientRect(); return n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), false, "QR does not intercept player clicks");
     assert.equal(await page.locator("#qr-fs").isVisible(), true);
+    // Chromium on CI cannot resize its window while it is fullscreen.
+    await page.evaluate(() => document.exitFullscreen());
+    await page.waitForFunction(() => !document.fullscreenElement);
+    await page.waitForSelector("#stage-controls-home #stage-controls");
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator("#fs-btn").click();
+    await page.waitForFunction(() => document.fullscreenElement === document.getElementById("stage"));
+    await page.waitForSelector("#stage #stage-controls");
     await page.waitForTimeout(300);
     const mobile = await page.locator("#stage-controls").boundingBox();
     assert.ok(mobile.x >= 0 && mobile.x + mobile.width <= 390, "mobile overlay fits horizontally");
