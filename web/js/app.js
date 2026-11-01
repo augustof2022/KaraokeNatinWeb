@@ -1809,11 +1809,16 @@
     document.body.classList.toggle("stage-fullscreen", on);
     var btn = $("#fs-btn");
     if (!btn) return;
+    var controls = $("#stage-controls");
+    var target = on ? $("#stage") : $("#stage-controls-home");
+    var focused = controls.contains(document.activeElement) ? document.activeElement : null;
+    if (controls.parentNode !== target) target.appendChild(controls);
     KN.setIcon(btn, on ? "fullscreen-exit" : "fullscreen");
     btn.title = on ? "Exit fullscreen" : "Fullscreen";
     btn.setAttribute("aria-label", btn.title);
     btn.setAttribute("aria-pressed", String(on));
     showStageControls();
+    if (focused) focused.focus();
   }
 
   var stageControlsTimer = null;
@@ -1832,7 +1837,8 @@
     clearTimeout(stageControlsTimer);
     stageControlsTimer = null;
     setStageControlsHidden(false);
-    if (app.role !== "host" || !app.state || app.state.player.status !== "playing") return;
+    if (!document.body.classList.contains("stage-fullscreen") || app.role !== "host" ||
+        !app.state || app.state.player.status !== "playing") return;
     stageControlsTimer = setTimeout(function hide() {
       stageControlsTimer = null;
       var controls = $("#stage-controls");
@@ -3490,7 +3496,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.8";
+  var APP_VERSION = "2.6.9";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;

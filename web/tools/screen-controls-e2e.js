@@ -1,5 +1,4 @@
-/* Screen overlay behavior with a local player stand-in. Fullscreen geometry is
- * checked with the same body flag because managed Chromium can forbid fullscreen. */
+/* Windowed and fullscreen screen controls with a local player stand-in. */
 "use strict";
 const assert = require("node:assert/strict");
 const http = require("node:http");
@@ -62,6 +61,13 @@ async function main() {
     await page.goto(base + "/#/host");
     await page.waitForFunction(() => KN.app.state.player.status === "playing");
     assert.equal(await page.locator("#stage-controls #transport").count(), 1);
+    assert.equal(await page.locator("#stage-controls-home #stage-controls").count(), 1);
+    await page.waitForTimeout(3300);
+    assert.equal(await page.locator("#stage-controls").isVisible(), true, "windowed controls remain available below the video");
+    await page.locator("#fs-btn").click();
+    await page.waitForFunction(() => document.fullscreenElement === document.getElementById("stage"));
+    await page.waitForSelector("#stage #stage-controls");
+    assert.equal(await page.locator("#stage #stage-controls").count(), 1, "fullscreen controls move into the stage");
     const stage = await page.locator("#stage").boundingBox();
     const button = await page.locator("#fs-btn").boundingBox();
     assert.ok(button.y > stage.y + stage.height / 2, "fullscreen button is in the bottom half");
@@ -91,7 +97,7 @@ async function main() {
     await page.touchscreen.tap(stage.x + 2, stage.y + 20);
     await page.waitForSelector("#stage-controls:not(.stage-controls-hidden)");
     console.log("  ok   touching the screen reveals controls");
-    await page.evaluate(() => { document.body.classList.add("stage-fullscreen"); KN.app.player.pause(); });
+    await page.evaluate(() => KN.app.player.pause());
     const fullscreenStage = await page.locator("#stage").boundingBox();
     const join = await page.locator("#fs-join").boundingBox();
     assert.ok(join && join.x > fullscreenStage.x + fullscreenStage.width / 2, "room QR stays on the right");
@@ -110,7 +116,11 @@ async function main() {
     const mobileJoin = await page.locator("#fs-join").boundingBox();
     assert.ok(mobileJoin.y >= mobileStage.y + 80, "mobile QR also clears the top menu row");
     console.log("  ok   QR sits below the top menu icons without blocking clicks; bottom controls fit mobile");
-    await page.evaluate(() => { document.body.classList.remove("stage-fullscreen"); KN.app.player.play(); });
+    await page.evaluate(() => document.exitFullscreen());
+    await page.waitForFunction(() => !document.fullscreenElement);
+    await page.waitForSelector("#stage-controls-home #stage-controls");
+    assert.equal(await page.locator("#stage-controls-home #stage-controls").count(), 1);
+    await page.evaluate(() => KN.app.player.play());
     await page.click("#leave-btn"); await page.click("#leave-room-close");
     await page.waitForSelector("#view-home:not([hidden])");
     await page.fill("#join-name", "Guest"); await page.fill("#join-code", "XYZ234");

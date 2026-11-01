@@ -31,7 +31,7 @@
       } catch (e) { /* private mode — fall back to the system preference */ }
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=2.6.8" />
+  <link rel="stylesheet" href="css/app.css?v=2.6.9" />
 </head>
 
 <body>
@@ -593,9 +593,13 @@
               <ul id="fs-pending-list"></ul>
             </aside>
           </div>
+        </div>
+
+        <!-- The same controls move into the stage only while it is fullscreen. -->
+        <div id="stage-controls-home" class="host-only">
           <div id="stage-controls" class="stage-controls" role="group" aria-label="Screen controls">
-          <div id="stage-transport-slot" class="stage-transport-slot"></div>
-          <button id="fs-btn" class="fs-btn" title="Fullscreen" aria-label="Toggle fullscreen"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" class="i" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.6A1.6 1.6 0 0 1 5.6 4H9" /><path d="M15 4h3.4A1.6 1.6 0 0 1 20 5.6V9" /><path d="M20 15v3.4a1.6 1.6 0 0 1-1.6 1.6H15" /><path d="M9 20H5.6A1.6 1.6 0 0 1 4 18.4V15" /></svg></button>
+            <div id="stage-transport-slot" class="stage-transport-slot"></div>
+            <button id="fs-btn" class="fs-btn" title="Fullscreen" aria-label="Toggle fullscreen"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" class="i" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.6A1.6 1.6 0 0 1 5.6 4H9" /><path d="M15 4h3.4A1.6 1.6 0 0 1 20 5.6V9" /><path d="M20 15v3.4a1.6 1.6 0 0 1-1.6 1.6H15" /><path d="M9 20H5.6A1.6 1.6 0 0 1 4 18.4V15" /></svg></button>
           </div>
         </div>
 
@@ -838,18 +842,18 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script src="js/icons.js?v=2.6.8"></script>
-  <script src="js/sound.js?v=2.6.8"></script>
-  <script src="js/fx.js?v=2.6.8"></script>
-  <script src="js/stats.js?v=2.6.8"></script>
-  <script src="js/games.js?v=2.6.8"></script>
-  <script src="js/qr.js?v=2.6.8"></script>
-  <script src="js/peer.js?v=2.6.8"></script>
-  <script src="js/search.js?v=2.6.8"></script>
-  <script src="js/library.js?v=2.6.8"></script>
-  <script src="js/room.js?v=2.6.8"></script>
-  <script src="js/player.js?v=2.6.8"></script>
-  <script src="js/embed.js?v=2.6.8"></script>
-  <script src="js/app.js?v=2.6.8"></script>
+  <script src="js/icons.js?v=2.6.9"></script>
+  <script src="js/sound.js?v=2.6.9"></script>
+  <script src="js/fx.js?v=2.6.9"></script>
+  <script src="js/stats.js?v=2.6.9"></script>
+  <script src="js/games.js?v=2.6.9"></script>
+  <script src="js/qr.js?v=2.6.9"></script>
+  <script src="js/peer.js?v=2.6.9"></script>
+  <script src="js/search.js?v=2.6.9"></script>
+  <script src="js/library.js?v=2.6.9"></script>
+  <script src="js/room.js?v=2.6.9"></script>
+  <script src="js/player.js?v=2.6.9"></script>
+  <script src="js/embed.js?v=2.6.9"></script>
+  <script src="js/app.js?v=2.6.9"></script>
 </body>
 </html>

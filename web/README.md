@@ -128,8 +128,8 @@ animations and limits background search checks during playback. Search may be
 slower, but YouTube playback and its controls remain independent. Idle search
 players are released after a short delay. You can turn this mode off at any time.
 
-Host playback controls and the fullscreen toggle share a bottom overlay.
-Pointer movement, a tap/click, or keyboard focus reveals it;
+Host playback controls and the fullscreen toggle sit below the windowed video.
+In fullscreen they share a bottom overlay. Pointer movement, a tap/click, or keyboard focus reveals it;
 it hides after three seconds of inactivity while playing and stays visible while
 paused or loading. Keyboard-focused controls and active slider drags stay visible.
 The fullscreen QR stays visible on the right, 80 pixels below the top edge (plus
@@ -296,8 +296,8 @@ anything happens. A tie goes to spinning again — the offer exists to keep a ga
 the tie-break should too — and nobody voting at all means the queue carries on, because
 silence is not a mandate to hijack it.
 
-The bar is one element with two homes: inside the stage on the host, where it survives
-fullscreen, and in the room body on a phone, which is where most of the hands are.
+The bar stays below the host video in windowed view and moves into the stage for
+fullscreen; guests keep their controls in the room body.
 
 ### Where it opens
 
@@ -563,6 +563,7 @@ node tools/player-controls-test.js # quality controls, sound readback, buffering
 node tools/peer-recovery-test.js # wake/offer/answer races, broker conflicts (no browser)
 node tools/session-recovery-e2e.js # browser resume, identity, explicit leave (stand-in transport)
 node tools/screen-controls-e2e.js # bottom overlay, auto-hide, pause, touch and keyboard behavior
+node tools/windowed-player-e2e.js # windowed player sizing, older CSS support and fullscreen transitions
 node tools/playback-performance-e2e.js # progress without rebuilding the room or rewriting storage
 node tools/leave-room-e2e.js  # app confirmation, room teardown, delayed player setup
 node tools/youtube-setup-e2e.js # optional account guidance, safe popup, skip, room restore
