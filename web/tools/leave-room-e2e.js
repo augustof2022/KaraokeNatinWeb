@@ -286,7 +286,8 @@ async function main() {
     await guest.waitForSelector("#view-room:not([hidden])");
     check("guest starts an active statistics session", await guest.evaluate(() =>
       JSON.parse(localStorage.getItem("kn:stats")).current !== null));
-    await guest.click("#leave-btn");
+    // This stand-in has no host snapshot, so the reconnect prompt owns Leave.
+    await guest.click("#guest-leave");
     await guest.waitForSelector("#view-home:not([hidden])");
     await assertHome(guest, "guest Leave");
     check("guest Leave stops the connection immediately", await guest.evaluate(() => window.__guestStops), 1);

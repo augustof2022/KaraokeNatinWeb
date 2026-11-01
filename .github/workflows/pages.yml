@@ -29,7 +29,20 @@ jobs:
           npm ci --prefix web/tools
           cd web/tools
           npx playwright install --with-deps chromium
-          npm test
+          set +e
+          npm test 2>&1 | tee "$RUNNER_TEMP/karaokenatin-tests.log"
+          test_status=("${PIPESTATUS[@]}")
+          set -e
+          if [ "${test_status[0]}" -ne 0 ]; then
+            # Preserve useful diagnostics in the run annotations as well as the log.
+            details="$(tail -n 30 "$RUNNER_TEMP/karaokenatin-tests.log")"
+            details="${details//'%'/'%25'}"
+            details="${details//$'\r'/'%0D'}"
+            details="${details//$'\n'/'%0A'}"
+            printf '::error title=Website tests failed::%s\n' "$details"
+            exit "${test_status[0]}"
+          fi
+          exit "${test_status[1]}"
       - name: Prepare static website
         run: |
           mkdir _site

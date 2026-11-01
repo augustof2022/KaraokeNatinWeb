@@ -57,8 +57,8 @@ Room connections are the part that actually breaks in the wild, so redundancy is
   stampede — capped hard while the tab is on screen, because somebody is watching it.
 - **Snapshot state.** The host broadcasts the whole room state on every change, so a guest
   that missed messages is correct again the moment one lands — no patch replay to get wrong.
-- **Queued commands.** Anything you tap while offline is held and flushed when the channel
-  reopens.
+- **Safe reconnecting.** Room controls are blocked while a guest is disconnected or waiting
+  for a fresh host snapshot. Commands tapped while offline are not queued for later.
 - **Session resume.** The host's room code, token, and queue survive a reload; guests are
   offered a rejoin. Reopening the same code puts everyone back in the same room.
 
@@ -91,6 +91,17 @@ page believed about its connection was frozen along with it, so none of it can b
   re-broadcasts the room — so the guest list is not full of people who left during the nap,
   and everyone still there is looking at the same queue.
 
+## Fullscreen and reconnecting
+
+Use the fullscreen button on the host video. When guests request to join, the
+host can allow or decline them from the panel beside the fullscreen video.
+YouTube’s controls remain usable; the separate embedded player does not forward
+double-click or double-tap gestures to the room’s fullscreen control.
+
+Disconnected guests see a reconnecting screen with **Retry now** and **Leave room**.
+Room controls return after the connection and a fresh host snapshot arrive. Actions
+attempted while disconnected are not queued or replayed.
+
 ## Playback performance and buffering
 
 The host plays YouTube directly in the browser. Phone remotes and GitHub Pages
@@ -101,6 +112,12 @@ YouTube’s own player controls are available on the video. If playback buffers,
 open its settings menu and try **Quality → 480p or 360p**, when that menu is
 available. The app does not force a resolution; YouTube controls quality selection.
 Use the room’s fullscreen button to retain the join QR code and score overlays.
+For older Android devices, **TV performance mode** turns on automatically when
+they can be recognized; otherwise enable it under **Setup**. It reduces room
+animations and limits background search checks during playback. Search may be
+slower, but YouTube playback and its controls remain independent. Idle search
+players are released after a short delay. You can turn this mode off at any time.
+
 Keep the host tab in the foreground. If it still pauses, compare the same video
 directly on YouTube on the same device, browser profile, and quality setting.
 
@@ -519,6 +536,8 @@ Individual checks below run from `web/` after installing the test runner:
 
 ```bash
 node tools/qr-test.js         # QR conformance: module counts, block layouts, capacities
+node tools/room-reliability-e2e.js # fullscreen approvals, disconnected guests, TV mode
+node tools/peer-offline-test.js # real transport rejects offline commands and verifies recovery
 node tools/player-controls-test.js # quality controls, sound readback, buffering events
 node tools/playback-performance-e2e.js # progress without rebuilding the room or rewriting storage
 node tools/leave-room-e2e.js  # app confirmation, room teardown, delayed player setup

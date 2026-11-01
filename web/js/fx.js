@@ -20,7 +20,8 @@
   var COLOURS = ["#ff4fa6", "#b36bff", "#7c4dff", "#f5c451", "#4fd6a2", "#ffffff", "#ff7cc0"];
 
   function reducedMotion() {
-    return !!(global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    return !!((document.body && document.body.classList.contains("tv-performance")) ||
+      (global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches));
   }
 
   function rand(a, b) { return a + Math.random() * (b - a); }

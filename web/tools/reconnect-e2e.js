@@ -161,6 +161,29 @@ async function main() {
   await host.waitForFunction(() => document.querySelector("#guest-count").textContent === "1", null, { timeout: 15000 });
   check("a guest joins the room to begin with", true);
 
+  // A data channel can still claim "open" while ICE reports a broken link.
+  // Protect actions immediately and verify the channel again when it heals.
+  const simulated = await guest.evaluate(() => {
+    const pc = window.__pcs.find((p) => p.connectionState === "connected");
+    if (!pc) return false;
+    window.__interruptedPc = pc;
+    Object.defineProperty(pc, "iceConnectionState", { configurable: true, value: "disconnected" });
+    pc.dispatchEvent(new Event("iceconnectionstatechange"));
+    return true;
+  });
+  check("test can simulate a briefly disconnected ICE link", simulated);
+  if (simulated) {
+    await guest.waitForSelector("#guest-reconnect:not([hidden])");
+    check("ICE interruption blocks room actions immediately", await guest.evaluate(() =>
+      window.KN.app.net.send({ type: "SKIP" }) === false));
+    await guest.evaluate(() => {
+      delete window.__interruptedPc.iceConnectionState;
+      window.__interruptedPc.dispatchEvent(new Event("iceconnectionstatechange"));
+    });
+    await guest.waitForSelector("#guest-reconnect", { state: "hidden", timeout: 15000 });
+    check("a healed link is verified and synchronized before controls return", true);
+  }
+
   /* ── 1. away, and back to a host that restarted ───────────────────────────
    * The headline case. The phone is put away, the host reloads (or crashes and
    * is reopened) while nothing on the guest is running to see it, and the guest
@@ -211,19 +234,24 @@ async function main() {
   const opened = (await guest.evaluate(() => window.__wss.length)) - before;
   check("only one retry loop survives the flurry", opened <= 6, opened + " sockets in 6s");
 
-  // Something tapped while it is down, to be flushed on the other side.
-  await guest.click('.tab[data-tab="queue"]');
-  const queuedWhileDown = await guest.evaluate(() => {
-    const btn = document.querySelector("#clear-btn");
-    return !!btn;
-  });
+  // Neither the UI nor the transport may replay an offline action later.
+  await guest.waitForSelector("#guest-reconnect:not([hidden])");
+  await guest.waitForFunction(() => !window.KN.app.net.isOpen(), null, { timeout: 30000 });
+  check("disconnected room controls are blocked", await guest.locator("#view-room").getAttribute("inert") !== null);
+  const sentWhileDown = await guest.evaluate(() => window.KN.app.net.send({
+    type: "ADD", video: { id: "zzzzzzzzzzz", title: "Offline action" }
+  }));
+  check("transport rejects an action while disconnected", sentWhileDown === false);
 
   await host.goto(base + "#/host");         // the room comes back on its own code
   await host.waitForSelector("#view-room:not([hidden])", { timeout: 15000 });
   check("host reopens on the same code", (await host.textContent("#room-code")).trim() === code);
   await guest.waitForSelector("#conn.conn-ok", { timeout: 60000 });
+  await guest.waitForSelector("#guest-reconnect", { state: "hidden", timeout: 30000 });
   check("guest finds the room again after the flurry", true);
-  check("guest had a control to press while offline", queuedWhileDown);
+  check("the offline action is not replayed after reconnecting", await host.evaluate(() =>
+    !window.KN.app.state.queue.some((song) => song.id === "zzzzzzzzzzz") &&
+    (!window.KN.app.state.now || window.KN.app.state.now.id !== "zzzzzzzzzzz")));
 
   /* ── 3. the host's own signalling socket dies unannounced ─────────────────
    * A sleeping laptop's WebSocket is closed by the OS with nobody listening.

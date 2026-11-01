@@ -16,8 +16,8 @@
  *   - data channels are heartbeated, and *probed* rather than assumed dead
  *   - one attempt is in flight at a time, so a wake-up never starts a stampede
  *   - both roles wake on visibility, network, bfcache restore and clock gaps
- *   - guests reconnect with exponential backoff + jitter, and flush the
- *     commands they queued while offline
+ *   - guests reconnect with exponential backoff + jitter; commands are only
+ *     sent while the room connection is open
  *
  * The hard case this is built around is a phone that was put away mid-song.
  * Everything about that moment is a lie: the socket still says "open", the
@@ -375,6 +375,7 @@
     var watchdog = null;
     var iceGrace = null;
     var dead = false;
+    var interrupted = false;
     var pingSeq = 0;
     var probes = {};       // probe id -> resolve
 
@@ -465,8 +466,15 @@
       if (ev.candidate) opts.onCandidate(ev.candidate.toJSON ? ev.candidate.toJSON() : ev.candidate);
     };
 
+    function checkInterruption() {
+      var down = pc.connectionState === "disconnected" || pc.iceConnectionState === "disconnected";
+      if (down && !interrupted) { interrupted = true; self.emit("interrupted"); }
+      else if (!down && interrupted) { interrupted = false; self.emit("restored"); }
+    }
+
     pc.onconnectionstatechange = function () {
       if (pc.connectionState === "failed") self.destroy("ice-failed");
+      else checkInterruption();
     };
 
     /* "disconnected" is routinely transient — a Wi-Fi handover, a few lost
@@ -481,6 +489,7 @@
       } else if (s === "failed") {
         self.destroy("ice-failed");
       }
+      if (!dead) checkInterruption();
     };
 
     if (opts.initiator) {
@@ -557,9 +566,14 @@
       try { dc.send(JSON.stringify(obj)); return true; } catch (e) { return false; }
     };
 
-    self.send = function (obj) { return self.raw(obj); };
+    self.send = function (obj) { return self.isOpen() && self.raw(obj); };
 
-    self.isOpen = function () { return !dead && !!dc && dc.readyState === "open"; };
+    self.isOpen = function () {
+      return !dead && !!dc && dc.readyState === "open" &&
+        pc.connectionState !== "disconnected" && pc.connectionState !== "failed" &&
+        pc.connectionState !== "closed" && pc.iceConnectionState !== "disconnected" &&
+        pc.iceConnectionState !== "failed" && pc.iceConnectionState !== "closed";
+    };
 
     self.destroy = function (reason) {
       if (dead) return;
@@ -663,6 +677,9 @@
         link.on("open", function () { if (links[cid] === link) self.emit("guest-open", link); });
         link.on("message", function (data) {
           if (links[cid] === link) self.emit("guest-message", link, data);
+        });
+        link.on("restored", function () {
+          if (links[cid] === link) self.emit("guest-restored", link);
         });
         link.on("close", function (reason) {
           if (links[cid] !== link) return;   // already replaced; not a departure
@@ -773,7 +790,6 @@
     var brokerIndex = 0;
     var lastGood = 0;
     var stopped = false;
-    var outbox = [];
     var unwake = null;
 
     self.code = normalizeCode(code);
@@ -891,11 +907,17 @@
         lastGood = brokerIndex;
         setState("connected", a.cfg.host);
         self.emit("open");
-        outbox.splice(0).forEach(function (m) { l.send(m); });
       });
 
       l.on("message", function (data) {
         if (a.gen === gen) self.emit("message", data);
+      });
+
+      l.on("interrupted", function () {
+        if (a.gen === gen && a.connected) self.emit("checking", "connection interrupted");
+      });
+      l.on("restored", function () {
+        if (a.gen === gen && a.connected) onWake("connection restored");
       });
 
       l.on("close", function (reason) {
@@ -984,6 +1006,9 @@
 
       var a = att;
       if (a && a.link && a.link.isOpen()) {
+        // A sleeping browser may still report an open channel. Block room
+        // actions until the wake probe and the host snapshot both complete.
+        self.emit("checking", reason);
         if (a.broker) a.broker.check();
         var l = a.link;
         l.probe(PROBE_MS).then(function (alive) {
@@ -1004,8 +1029,6 @@
 
     self.send = function (obj) {
       if (att && att.link && att.link.isOpen()) return att.link.send(obj);
-      outbox.push(obj);
-      if (outbox.length > 50) outbox.shift();
       return false;
     };
 

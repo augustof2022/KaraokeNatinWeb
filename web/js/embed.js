@@ -37,6 +37,7 @@
   var KN = (global.KN = global.KN || {});
 
   var POOL_SIZE = 3;          // concurrent probes; also the render fan-out
+  var IDLE_MS = 4000;         // release unused iframe players after a search
   var PROBE_MS = 6500;        // a silent player is an answer we won't get
   /* CUED is not the end of the story. YouTube accepts the id, moves the
    * player to "video cued", and only then decides it will not serve it here —
@@ -196,6 +197,11 @@
             catch (err) { done(UNKNOWN); }
           });
         };
+        slot.dispose = function () {
+          try { if (player.destroy) player.destroy(); } catch (e) { /* already removed */ }
+          var frame = document.getElementById(slot.id);
+          if (frame) frame.remove();
+        };
 
         /* A player that never reports ready is a player that never will —
          * but only foreground seconds count towards saying so. A backgrounded
@@ -208,6 +214,7 @@
           idled += 500;
           if (idled >= 15000) {
             clearInterval(watch);
+            slot.dispose();
             reject(new Error("probe player did not start"));
           }
         }, 500);
@@ -225,7 +232,12 @@
 
   function acquire() {
     if (poolBroken) return Promise.resolve(null);
-    if (idle.length) return Promise.resolve(idle.pop());
+    if (idle.length) {
+      var slot = idle.pop();
+      clearTimeout(slot.idleTimer);
+      slot.idleTimer = null;
+      return Promise.resolve(slot);
+    }
     if (slots.length + building < POOL_SIZE) {
       building++;
       return makeSlot().then(
@@ -239,7 +251,17 @@
   function release(slot) {
     var next = waiting.shift();
     if (next) next(slot);
-    else idle.push(slot);
+    else {
+      idle.push(slot);
+      slot.idleTimer = setTimeout(function () {
+        var at = idle.indexOf(slot);
+        if (at === -1) return;
+        idle.splice(at, 1);
+        var index = slots.indexOf(slot);
+        if (index !== -1) slots.splice(index, 1);
+        slot.dispose();
+      }, IDLE_MS);
+    }
   }
 
   /* ---------------- public API ---------------- */
@@ -330,7 +352,9 @@
 
     function pump() {
       if (cancelled) return;
-      while (active < POOL_SIZE && next < list.length) {
+      var desired = typeof opts.concurrency === "function" ? opts.concurrency() : opts.concurrency;
+      var limit = Math.max(1, Math.min(POOL_SIZE, Number(desired) || POOL_SIZE));
+      while (active < limit && next < list.length) {
         (function (video, rank) {
           active++;
           check(video.id).then(function (verdict) {

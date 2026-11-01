@@ -110,6 +110,7 @@
     clientId: null,
     name: "",
     connection: "offline",
+    guestSynced: false, // guest must receive a fresh snapshot after reconnecting
     guestNames: {},    // host only: link.id -> display name
     searchBusy: false,
     playerError: false,    // host only: the stage is showing a load failure
@@ -183,6 +184,11 @@
           refreshGuestList();
           // Who's in the room isn't something a guest's queue/playback
           // request could go stale against — don't bump rev over it.
+          broadcastState({ progress: true });
+        },
+        "guest-restored": function () {
+          if (!currentRoom()) return;
+          refreshGuestList();
           broadcastState({ progress: true });
         },
         broker: function () { if (currentRoom()) render(); },
@@ -1388,12 +1394,14 @@
 
   function startGuest(code) {
     app.role = "guest";
+    app.guestSynced = false;
     app.state = R.createState(code);
     app.name = app.name || loadName() || "";
 
     app.net = KN.net.join(code, {
       state: function (s, detail) {
         app.connection = s;
+        if (s !== "connected") app.guestSynced = false;
         renderConnection(detail);
       },
       open: function () {
@@ -1401,7 +1409,8 @@
         app.net.send({ type: CMD.RESYNC });
       },
       message: function (data) { onHostMessage(data); },
-      closed: function () { renderConnection(); },
+      closed: function () { app.guestSynced = false; renderConnection(); },
+      checking: function () { app.guestSynced = false; renderConnection(); },
       wake: function () {
         // The channel proved itself alive, but it was deaf while we were away.
         app.net.send({ type: CMD.HELLO, name: app.name || "Guest" });
@@ -1422,8 +1431,10 @@
         break;
       case MSG.STATE: {
         // Snapshots are authoritative; an out-of-order straggler is dropped.
-        if (app.state && data.rev < app.state.rev) return;
+        if (app.guestSynced && app.state && data.rev < app.state.rev) return;
         app.state = data.state;
+        app.guestSynced = !!(app.net && typeof app.net.isOpen === "function" &&
+          app.net.isOpen() && navigator.onLine !== false);
         app.waiting = !!app.state.lobby;
         if (KN.sound) KN.sound.setEnabled(!app.state.config || app.state.config.sounds !== false);
         // A guest has no stage to put the score on, so it arrives as a toast —
@@ -1467,12 +1478,15 @@
    * on a view that has since moved on. */
   function dispatch(cmd) {
     if (cmd.type === CMD.ADD && !cmd.byId) cmd.byId = app.role === "host" ? "host" : app.clientId;
-    if (app.role === "host") handle(cmd, app.name || "Host");
-    else if (app.net) {
+    if (app.role === "host") { handle(cmd, app.name || "Host"); return true; }
+    if (app.role === "guest" && guestReady()) {
       cmd.rev = app.state ? app.state.rev : 0;
-      app.net.send(cmd);
-      if (!app.net.isOpen()) toast("Offline — queued until you reconnect.", "warn");
+      if (app.net.send(cmd) !== false) return true;
+      app.guestSynced = false;
+      if (app.net.retryNow) app.net.retryNow();
     }
+    updateGuestReconnect();
+    return false;
   }
 
   /** The host, and anyone it has made a co-host, can run the room. */
@@ -1490,16 +1504,25 @@
     try { return localStorage.getItem(STORE.name) || ""; } catch (e) { return ""; }
   }
   function saveName(n) {
+    if (app.role === "guest") {
+      if (!guestReady() || app.net.send({ type: CMD.NAME, name: n }) === false) {
+        app.guestSynced = false;
+        updateGuestReconnect();
+        if (app.net && app.net.retryNow) app.net.retryNow();
+        return false;
+      }
+    }
     app.name = n;
     try { localStorage.setItem(STORE.name, n); } catch (e) { /* ignore */ }
-    if (app.role === "guest" && app.net) app.net.send({ type: CMD.NAME, name: n });
-    else if (app.role === "host") { app.state.hostName = n; broadcastState({ progress: true }); }
-    else render();
+    if (app.role === "host") { app.state.hostName = n; broadcastState({ progress: true }); }
+    else if (app.role !== "guest") render();
+    return true;
   }
 
   function leave() {
     var net = app.net;
     playerGeneration++;
+    cancelPendingSearch();
     closeLeaveConfirmation(false);
     if (app.role === "host") {
       forget(STORE.host);
@@ -1518,6 +1541,7 @@
     if (KN.stats) KN.stats.endSession();
     forget(STORE.guest);
     app.role = null;
+    app.guestSynced = false;
     app.net = null;
     app.player = null;
     app.state = null;
@@ -1528,6 +1552,7 @@
     app.upNextFor = null;
     app.lastScoreAt = 0;
     document.body.classList.remove("can-manage");
+    updateGuestReconnect();
     location.hash = "#/";
     showHome();
     $("#host-btn").focus();
@@ -1862,11 +1887,59 @@
       hosting: ["ok", "hosting"],
       unlisted: ["warn", "reconnecting…"]
     };
-    var e = map[app.connection] || ["bad", app.connection];
+    // An open data channel alone is not enough: wait for a fresh snapshot.
+    var displayState = app.role === "guest" && app.connection === "connected" && !guestReady()
+      ? "connecting" : app.connection;
+    var e = map[displayState] || ["bad", displayState];
     badge.className = "conn conn-" + e[0];
     badge.textContent = e[1];
     badge.title = detail ? "via " + detail : "";
-    $("#retry-btn").hidden = app.role !== "guest" || app.connection === "connected";
+    $("#retry-btn").hidden = app.role !== "guest" || displayState === "connected";
+    updateGuestReconnect();
+  }
+
+  function guestReady() {
+    return app.role === "guest" && navigator.onLine !== false && !!app.net &&
+      typeof app.net.isOpen === "function" && app.net.isOpen() && app.guestSynced;
+  }
+
+  var focusBeforeReconnect = null;
+  function cancelPendingSearch() {
+    if (!app.searchBusy && !app.searchSweep) return;
+    if (app.searchSweep) app.searchSweep.cancel();
+    app.searchSweep = null;
+    app.searchRun = null;
+    app.searchBusy = false;
+    var status = $("#search-status");
+    if (status) status.textContent = "Search stopped. Please try again.";
+  }
+
+  function updateGuestReconnect() {
+    var overlay = $("#guest-reconnect");
+    var room = $("#view-room");
+    if (!overlay || !room) return;
+    var blocked = app.role === "guest" && !guestReady();
+    if (blocked && overlay.hidden) {
+      cancelPendingSearch();
+      focusBeforeReconnect = document.activeElement;
+      room.setAttribute("inert", "");
+      overlay.hidden = false;
+      $("#guest-retry").focus();
+      room.setAttribute("aria-hidden", "true");
+    } else if (!blocked && !overlay.hidden) {
+      var restore = overlay.contains(document.activeElement);
+      overlay.hidden = true;
+      room.removeAttribute("inert");
+      room.removeAttribute("aria-hidden");
+      if (restore && app.role === "guest") {
+        var target = focusBeforeReconnect;
+        if (!target || !document.contains(target) || !target.getClientRects().length) {
+          target = $(".tab[aria-selected='true']");
+        }
+        if (target) target.focus();
+      }
+      focusBeforeReconnect = null;
+    }
   }
 
   function render() {
@@ -1969,6 +2042,39 @@
     document.body.classList.toggle("in-lobby", stuck);
 
     var pending = (s && s.pending) || [];
+    var fullscreenPending = $("#fs-pending");
+    var fullscreenList = $("#fs-pending-list");
+    if (fullscreenPending && fullscreenList) {
+      var focused = document.activeElement;
+      var hadFocus = fullscreenPending.contains(focused);
+      var focusedId = hadFocus && focused.getAttribute("data-guest-id");
+      var focusedAction = hadFocus && focused.getAttribute("data-action");
+      fullscreenPending.hidden = app.role !== "host" || !pending.length;
+      fullscreenList.innerHTML = "";
+      if (app.role === "host") pending.forEach(function (g) {
+        fullscreenList.appendChild(el("li", {}, [
+          el("strong", { text: g.name }),
+          el("div", { class: "fs-pending-actions" }, [
+            el("button", { class: "btn btn-primary", type: "button", text: "Allow",
+              "aria-label": "Let " + g.name + " in",
+              "data-guest-id": g.id, "data-action": "allow",
+              onclick: function () { dispatch({ type: CMD.APPROVE, id: g.id, ok: true }); } }),
+            el("button", { class: "btn btn-ghost", type: "button", text: "Decline",
+              "aria-label": "Refuse " + g.name,
+              "data-guest-id": g.id, "data-action": "decline",
+              onclick: function () { dispatch({ type: CMD.APPROVE, id: g.id, ok: false }); } })
+          ])
+        ]));
+      });
+      if (hadFocus) {
+        var buttons = Array.prototype.slice.call(fullscreenList.querySelectorAll("button"));
+        var same = buttons.find(function (b) {
+          return b.getAttribute("data-guest-id") === focusedId && b.getAttribute("data-action") === focusedAction;
+        });
+        var focusTarget = same || buttons[0] || $("#fs-btn");
+        if (focusTarget) focusTarget.focus();
+      }
+    }
     var badge = $("#pending-count");
     if (badge) {
       badge.hidden = !pending.length || !canManage();
@@ -2455,12 +2561,15 @@
      * what they want, and second-guessing that is the app arguing with an
      * explicit instruction. */
     if (KN.search.parseVideoId(q)) {
+      var pasteRun = {};
+      app.searchRun = pasteRun;
       status.textContent = "Reading link…";
       results.innerHTML = "";
       app.searchBusy = true;
       KN.search
         .resolve(q)
         .then(function (video) {
+          if (app.searchRun !== pasteRun) return null;
           // The same gate the search results go through: a link that cannot be
           // embedded is a song that dies on the host screen, so say so here
           // rather than in front of everybody three turns from now.
@@ -2473,13 +2582,17 @@
           });
         })
         .then(function (video) {
-          input.value = "";
-          status.textContent = "";
+          if (app.searchRun !== pasteRun || !video) return;
           if (app.role) {
-            dispatch({ type: CMD.ADD, video: video });
-            confirmAdded(video.title);
-            switchTab("queue");
+            if (dispatch({ type: CMD.ADD, video: video })) {
+              input.value = "";
+              status.textContent = "";
+              confirmAdded(video.title);
+              switchTab("queue");
+            }
           } else {
+            input.value = "";
+            status.textContent = "";
             // Outside a room there is no queue to add to, so a pasted link
             // goes where it can still be useful later.
             if (!LIB.hasSong(video.id)) LIB.toggleSong(video);
@@ -2487,8 +2600,10 @@
             toast("Saved “" + video.title + "” to your library");
           }
         })
-        .catch(function (e) { status.textContent = e.message; })
-        .finally(function () { app.searchBusy = false; });
+        .catch(function (e) { if (app.searchRun === pasteRun) status.textContent = e.message; })
+        .finally(function () {
+          if (app.searchRun === pasteRun) { app.searchBusy = false; app.searchRun = null; }
+        });
       return;
     }
 
@@ -2559,6 +2674,10 @@
           var base = (run.round - 1) * 1000;   // later rounds sort after earlier ones
           app.searchSweep = KN.embed.filter(fresh, {
             limit: SEARCH_CHECK_LIMIT,
+            concurrency: function () {
+              return document.body.classList.contains("tv-performance") && app.role === "host" &&
+                app.state && app.state.now && app.state.player.status !== "paused" ? 1 : KN.embed.POOL_SIZE;
+            },
             onAccept: function (video, rank, verdict) {
               if (stopped()) return;
               app.lastResults.push(video);
@@ -2671,8 +2790,7 @@
             class: "add-btn",
             text: "Add",
             onclick: function () {
-              dispatch({ type: CMD.ADD, video: v });
-              confirmAdded(v.title);
+              if (dispatch({ type: CMD.ADD, video: v })) confirmAdded(v.title);
             }
           })
         : null
@@ -2807,16 +2925,16 @@
   function queueButton(song) {
     if (!app.role) return null;
     return btn("arrow-up-right", "Add to the room queue", function () {
-      dispatch({ type: CMD.ADD, video: song });
-      confirmAdded(song.title);
+      if (dispatch({ type: CMD.ADD, video: song })) confirmAdded(song.title);
     });
   }
 
   function queuePlaylist(p) {
     if (!app.role || !p.songs.length) return;
-    p.songs.forEach(function (song) { dispatch({ type: CMD.ADD, video: song }); });
-    toast("Queued " + p.songs.length + " from “" + p.name + "”");
-    switchTab("queue");
+    var sent = 0;
+    p.songs.forEach(function (song) { if (dispatch({ type: CMD.ADD, video: song })) sent++; });
+    if (sent) toast("Queued " + sent + " from “" + p.name + "”");
+    if (sent === p.songs.length) switchTab("queue");
   }
 
   /* ---------------- sharing a library ----------------
@@ -3290,7 +3408,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.4";
+  var APP_VERSION = "2.6.5";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;
@@ -3519,6 +3637,22 @@
     });
   }
 
+  function setupTVPerformance() {
+    var key = "kn:tv-performance";
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) { /* storage unavailable */ }
+    var tv = /smart.?tv|android tv|googletv|hbbtv|tizen|web0s|webos|bravia|viera|roku|wanbo|t2 max|aft[bmst]/i.test(navigator.userAgent) ||
+      /android\s+[4-9](?:\.\d+)?\b/i.test(navigator.userAgent);
+    var checkbox = $("#cfg-tv-performance");
+    checkbox.checked = saved === null ? tv : saved === "1";
+    function apply() { document.body.classList.toggle("tv-performance", checkbox.checked); }
+    apply();
+    checkbox.addEventListener("change", function () {
+      apply();
+      try { localStorage.setItem(key, checkbox.checked ? "1" : "0"); } catch (e) { /* storage unavailable */ }
+    });
+  }
+
   /* ---------------- routing ---------------- */
 
   function route() {
@@ -3535,9 +3669,10 @@
       if (app.role && app.state && app.state.code === code) return;
       if (app.pendingJoin === code) return;   // the name gate is already up for it
       if (app.role) {
-        if (app.net) app.net.stop();
-        if (app.player) app.player.destroy();
-        clearInterval(ticker);
+        // Fully leave the previous room before asking for the new guest name.
+        // Otherwise its stopped connection can keep the reconnect screen open.
+        leave();
+        history.replaceState(null, "", "#/r/" + code);
       }
       enterRoom(code);
       return;
@@ -3622,6 +3757,24 @@
       leave();
     });
     $("#retry-btn").addEventListener("click", function () { if (app.net) app.net.retryNow(); });
+    $("#guest-retry").addEventListener("click", function () { if (app.net) app.net.retryNow(); });
+    $("#guest-leave").addEventListener("click", function () { if (app.role === "guest") leave(); });
+    $("#guest-reconnect").addEventListener("keydown", function (e) {
+      if (e.key !== "Tab") return;
+      var retry = $("#guest-retry"), leaveButton = $("#guest-leave");
+      if (e.shiftKey && document.activeElement === retry) { e.preventDefault(); leaveButton.focus(); }
+      else if (!e.shiftKey && document.activeElement === leaveButton) { e.preventDefault(); retry.focus(); }
+    });
+    document.addEventListener("focusin", function (e) {
+      var overlay = $("#guest-reconnect");
+      if (!overlay.hidden && !overlay.contains(e.target)) $("#guest-retry").focus();
+    });
+    global.addEventListener("offline", function () {
+      if (app.role === "guest") { app.guestSynced = false; renderConnection(); }
+    });
+    global.addEventListener("online", function () {
+      if (app.role === "guest") renderConnection();
+    });
 
     $("#copy-btn").addEventListener("click", function () {
       var url = joinUrl();
@@ -3645,8 +3798,8 @@
         toast("Your name cannot be empty.", "warn");
         return;
       }
-      saveName(name);
-      toast("Name saved");
+      if (saveName(name)) toast("Name saved");
+      else this.value = app.name;
     });
 
     // transport
@@ -3854,6 +4007,7 @@
     $("#disclaimer").addEventListener("click", function (e) { if (e.target === this) this.hidden = true; });
 
     document.addEventListener("keydown", function (e) {
+      if (!$("#guest-reconnect").hidden) return;
       if (e.key !== "Escape") return;
       if (!$("#leave-room-confirm").hidden) { e.preventDefault(); closeLeaveConfirmation(); return; }
       if (!$("#picker").hidden) closePicker();
@@ -3900,6 +4054,7 @@
     setupNameGate();
     setupLeaveConfirmation();
     setupYouTubeAccount();
+    setupTVPerformance();
     setupUpdateUI();
     switchTab("queue");
     startLocalClock();
