@@ -31,7 +31,7 @@
       } catch (e) { /* private mode — fall back to the system preference */ }
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=2.6.9" />
+  <link rel="stylesheet" href="css/app.css?v=2.6.10" />
 </head>
 
 <body>
@@ -233,6 +233,7 @@
       <h2 id="guest-reconnect-title">Reconnecting to the room</h2>
       <p id="guest-reconnect-text">You’re disconnected. We’re trying to reconnect;
         room controls will return when the connection is ready.</p>
+      <p id="guest-connection-help" hidden></p>
       <div class="leave-room-actions">
         <button type="button" id="guest-retry" class="btn btn-primary">Retry now</button>
         <button type="button" id="guest-leave" class="btn btn-ghost">Leave room</button>
@@ -589,7 +590,8 @@
               <span id="room-code-4" class="fs-code"></span>
             </div>
             <aside id="fs-pending" class="fs-pending" aria-labelledby="fs-pending-title" aria-live="polite" hidden>
-              <h2 id="fs-pending-title">Waiting to join</h2>
+              <h2 id="fs-pending-title">Join requests</h2>
+              <p id="fs-connection-status" role="status" hidden></p>
               <ul id="fs-pending-list"></ul>
             </aside>
           </div>
@@ -800,7 +802,7 @@
                 <input type="checkbox" id="cfg-sounds" />
                 <span class="cfg-text">
                   <strong>Room sounds</strong>
-                  <em>The roulette's ticking and the drumroll under a score.</em>
+                  <em>Roulette and room effects. Score reveals are silent.</em>
                 </span>
               </label>
               <p class="side-note">Only the host and co-hosts can change these.</p>
@@ -842,18 +844,19 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script src="js/icons.js?v=2.6.9"></script>
-  <script src="js/sound.js?v=2.6.9"></script>
-  <script src="js/fx.js?v=2.6.9"></script>
-  <script src="js/stats.js?v=2.6.9"></script>
-  <script src="js/games.js?v=2.6.9"></script>
-  <script src="js/qr.js?v=2.6.9"></script>
-  <script src="js/peer.js?v=2.6.9"></script>
-  <script src="js/search.js?v=2.6.9"></script>
-  <script src="js/library.js?v=2.6.9"></script>
-  <script src="js/room.js?v=2.6.9"></script>
-  <script src="js/player.js?v=2.6.9"></script>
-  <script src="js/embed.js?v=2.6.9"></script>
-  <script src="js/app.js?v=2.6.9"></script>
+  <script src="js/icons.js?v=2.6.10"></script>
+  <script src="js/sound.js?v=2.6.10"></script>
+  <script src="js/fx.js?v=2.6.10"></script>
+  <script src="js/stats.js?v=2.6.10"></script>
+  <script src="js/games.js?v=2.6.10"></script>
+  <script src="js/qr.js?v=2.6.10"></script>
+  <script src="js/connection-config.js?v=2.6.10"></script>
+  <script src="js/peer.js?v=2.6.10"></script>
+  <script src="js/search.js?v=2.6.10"></script>
+  <script src="js/library.js?v=2.6.10"></script>
+  <script src="js/room.js?v=2.6.10"></script>
+  <script src="js/player.js?v=2.6.10"></script>
+  <script src="js/embed.js?v=2.6.10"></script>
+  <script src="js/app.js?v=2.6.10"></script>
 </body>
 </html>

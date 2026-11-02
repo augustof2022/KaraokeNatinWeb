@@ -111,6 +111,11 @@
     name: "",
     connection: "offline",
     guestSynced: false, // guest must receive a fresh snapshot after reconnecting
+    guestEverConnected: false,
+    joinPhase: "broker",
+    joinDetail: "",
+    joinFailure: "",
+    hostJoinError: "",
     guestNames: {},    // host only: link.id -> display name
     searchBusy: false,
     playerError: false,    // host only: the stage is showing a load failure
@@ -141,6 +146,7 @@
     app.name = app.name || loadName() || "Host";
     app.hostToken = (resumed && resumed.token) || null;
     app.hostWasListed = false;
+    app.hostJoinError = "";
     app.approved = {};
 
     if (resumed && resumed.queue) {
@@ -171,6 +177,7 @@
       on: {
         "guest-open": function (link) {
           if (!currentRoom()) return;
+          app.hostJoinError = "";
           app.guestNames[link.id] = app.guestNames[link.id] || "Guest";
           link.send({ type: MSG.WELCOME, clientId: link.id, code: code });
           refreshGuestList();
@@ -178,8 +185,11 @@
           render();
         },
         "guest-message": function (link, data) { if (currentRoom()) onGuestCommand(link, data); },
-        "guest-close": function (link) {
+        "guest-connecting": function () { if (currentRoom()) { app.hostJoinError = ""; renderLobby(); } },
+        "guest-close": function (link, reason) {
           if (!currentRoom()) return;
+          if (reason === "relay-unavailable") app.hostJoinError = "The connection service is unavailable. New guests are retrying automatically.";
+          else if (reason === "connect-timeout" || reason === "answer-failed") app.hostJoinError = "A guest connection could not finish. Waiting for another attempt…";
           delete app.guestNames[link.id];
           refreshGuestList();
           // Who's in the room isn't something a guest's queue/playback
@@ -678,7 +688,7 @@
    * a performance, and scoring it would make the number worthless.
    *
    * It is not simply printed any more. A number that appears is information;
-   * a number that climbs, under a drumroll, in front of the person who just
+   * a number that climbs in front of the person who just
    * sang, is the moment the whole app exists for. The count-up eases out, so
    * it races through the seventies and then agonises over the last three —
    * which is where the room actually makes noise. The leaderboard slides in
@@ -789,7 +799,6 @@
     card.classList.remove("in");
     void card.offsetWidth;
     card.classList.add("in", "counting");
-    if (sfxOn()) KN.sound.whoosh();
 
     var board = $("#score-board");
     if (board) { board.hidden = true; board.innerHTML = ""; }
@@ -797,15 +806,12 @@
     countUp(value, entry.score, function () {
       card.classList.remove("counting");
       card.classList.add("revealed");
-      if (sfxOn()) KN.sound.celebrate(entry.band);
       celebrateScore(card, entry.band);
-      speak(entry.line);
       setTimeout(function () { revealBoard(before, after, entry); }, SCORE_BOARD_MS);
     });
   }
 
-  /* The picture half of the reaction; KN.sound.celebrate is the other half.
-   * Confetti is kept for the scores that earn it — if every 78 got a cannon,
+  /* Score reveals are silent. Confetti is kept for the scores that earn it — if every 78 got a cannon,
    * the 97 would have nothing left to say. */
   function celebrateScore(card, band) {
     if (!KN.fx) return;
@@ -820,19 +826,14 @@
   }
 
   /**
-   * Counts `node` from zero to `target`, easing out, and ticks as it goes.
-   * The ticks are paced off the same curve as the number, so they thin out as
-   * it settles — which is what makes it read as a wheel slowing down rather
-   * than as a progress bar filling.
+   * Counts `node` from zero to `target`, easing out without score audio.
    */
   function countUp(node, target, done) {
-    if (scoreAnim) { cancelAnimationFrame(scoreAnim.frame); if (scoreAnim.roll) scoreAnim.roll.stop(); }
+    if (scoreAnim) cancelAnimationFrame(scoreAnim.frame);
     if (reducedMotion()) { node.textContent = String(target); done(); return; }
 
-    var roll = sfxOn() ? KN.sound.drumroll(SCORE_COUNT_MS / 1000) : null;
     var began = 0;
-    var lastTick = 0;
-    var state = { frame: 0, roll: roll };
+    var state = { frame: 0 };
     scoreAnim = state;
 
     function step(now) {
@@ -850,16 +851,8 @@
         node.classList.add("bump");
       }
 
-      // 40ms between ticks at the start, a third of a second by the end.
-      var gap = 40 + 300 * p * p;
-      if (sfxOn() && now - lastTick >= gap) {
-        lastTick = now;
-        KN.sound.tick(1 - 0.5 * p);
-      }
-
       if (p < 1) { state.frame = requestAnimationFrame(step); return; }
       node.textContent = String(target);
-      if (roll) roll.crest();
       scoreAnim = null;
       done();
     }
@@ -956,7 +949,6 @@
     }
     if (scoreAnim) {
       cancelAnimationFrame(scoreAnim.frame);
-      if (scoreAnim.roll) scoreAnim.roll.stop();
       scoreAnim = null;
     }
   }
@@ -1389,6 +1381,10 @@
     try { identity = sessionStorage.getItem("kn:guest:identity:" + code) || identity; } catch (e) { /* storage unavailable */ }
     app.role = "guest";
     app.guestSynced = false;
+    app.guestEverConnected = false;
+    app.joinPhase = "broker";
+    app.joinDetail = "";
+    app.joinFailure = "";
     app.state = R.createState(code);
     app.name = app.name || loadName() || "";
 
@@ -1399,6 +1395,8 @@
       state: function (s, detail) {
         if (app.role !== "guest" || (app.net !== net && app.state !== room)) return;
         app.connection = s;
+        app.joinDetail = detail || "";
+        if (s === "retrying") app.joinFailure = detail || "";
         if (s !== "connected") app.guestSynced = false;
         renderConnection(detail);
       },
@@ -1409,6 +1407,7 @@
         app.net.send({ type: CMD.RESYNC });
       },
       message: function (data) { if (currentRoom()) onHostMessage(data); },
+      progress: function (phase) { if (currentRoom()) { app.joinPhase = phase; renderConnection(); } },
       closed: function () { if (currentRoom()) { app.guestSynced = false; renderConnection(); } },
       checking: function () { if (currentRoom()) { app.guestSynced = false; renderConnection(); } },
       wake: function () {
@@ -1444,6 +1443,7 @@
         app.state = data.state;
         app.guestSynced = !!(app.net && typeof app.net.isOpen === "function" &&
           app.net.isOpen() && navigator.onLine !== false);
+        if (app.guestSynced) { app.guestEverConnected = true; app.joinFailure = ""; }
         // Refresh the resume window without writing storage on every progress
         // snapshot. The opaque identity preserves the host's prior approval.
         var saved = load(STORE.guest);
@@ -1558,6 +1558,7 @@
     forget(STORE.guest);
     app.role = null;
     app.guestSynced = false;
+    app.guestEverConnected = false;
     app.net = null;
     app.player = null;
     app.state = null;
@@ -1974,8 +1975,8 @@
       unlisted: ["warn", "hosting · invites reconnecting…"]
     };
     // An open data channel alone is not enough: wait for a fresh snapshot.
-    var displayState = app.role === "guest" && app.connection === "connected" && !guestReady()
-      ? "connecting" : app.connection;
+    var displayState = app.role === "guest" && ((app.connection === "connected" && !guestReady()) ||
+      (app.connection === "retrying" && !app.guestEverConnected)) ? "connecting" : app.connection;
     var e = map[displayState] || ["bad", displayState];
     badge.className = "conn conn-" + e[0];
     badge.textContent = e[1];
@@ -1990,6 +1991,7 @@
   }
 
   var focusBeforeReconnect = null;
+  var guestSyncTimer = null;
   function cancelPendingSearch() {
     if (!app.searchBusy && !app.searchSweep) return;
     if (app.searchSweep) app.searchSweep.cancel();
@@ -2005,6 +2007,40 @@
     var room = $("#view-room");
     if (!overlay || !room) return;
     var blocked = app.role === "guest" && !guestReady();
+    var title = $("#guest-reconnect-title");
+    var message = $("#guest-reconnect-text");
+    if (blocked) {
+      title.textContent = app.guestEverConnected ? "Reconnecting to the room" : "Joining the room";
+      var phases = {
+        broker: "Connecting to the room service. Keep this page open; we’ll continue automatically.",
+        host: "Looking for the host. Keep the host’s room page open.",
+        peer: "Connecting your device to the host. The host will receive your approval request when this connection is ready.",
+        relay: "Preparing a secure connection between your device and the host…",
+        sync: "Connected to the host. Loading the room…"
+      };
+      var failures = {
+        "broker-unavailable": "The room service did not respond. Trying another connection automatically.",
+        "no-host": "The host could not be found yet. Check the room code and keep the host’s room page open.",
+        "host-unreachable": "The host did not answer yet. Keep its room page open; we’re trying again automatically.",
+        "peer-timeout": "The host answered, but the connection between the networks did not finish. Trying again automatically.",
+        "ice-failed": "The network could not connect the devices. Trying again automatically.",
+        "relay-unavailable": "The connection service is temporarily unavailable. Trying again automatically."
+      };
+      message.textContent = navigator.onLine === false ? "Your device is offline. Room controls will return after you reconnect." :
+        (app.connection === "retrying" && failures[app.joinDetail]) || phases[app.joinPhase] || "Checking the connection to the host…";
+      var help = $("#guest-connection-help");
+      help.textContent = failures[app.joinFailure] || "";
+      help.hidden = !help.textContent || app.connection === "retrying";
+    }
+    // Re-request the snapshot if an open channel has not finished the join.
+    // These are handshake messages, never queued room actions.
+    if (blocked && navigator.onLine !== false && app.net && app.net.isOpen && app.net.isOpen()) {
+      if (!guestSyncTimer) guestSyncTimer = setInterval(function () {
+        if (app.role !== "guest" || guestReady() || !app.net || !app.net.isOpen()) return;
+        app.net.send({type:CMD.HELLO, name:app.name || "Guest"});
+        app.net.send({type:CMD.RESYNC});
+      }, 3000);
+    } else { clearInterval(guestSyncTimer); guestSyncTimer = null; }
     if (blocked && overlay.hidden) {
       cancelPendingSearch();
       focusBeforeReconnect = document.activeElement;
@@ -2132,11 +2168,17 @@
     var fullscreenPending = $("#fs-pending");
     var fullscreenList = $("#fs-pending-list");
     if (fullscreenPending && fullscreenList) {
+      var connecting = app.role === "host" && app.net && app.net.connectingGuests ? app.net.connectingGuests().length : 0;
+      var unlisted = app.role === "host" && app.net && app.net.onlineBrokers() === 0;
+      var connectionStatus = $("#fs-connection-status");
+      connectionStatus.hidden = !connecting && !unlisted && !app.hostJoinError;
+      connectionStatus.textContent = unlisted ? "Room service unavailable. New guests cannot reach this host yet. Reconnecting automatically…" :
+        connecting ? connecting + (connecting === 1 ? " guest is connecting…" : " guests are connecting…") : app.hostJoinError;
       var focused = document.activeElement;
       var hadFocus = fullscreenPending.contains(focused);
       var focusedId = hadFocus && focused.getAttribute("data-guest-id");
       var focusedAction = hadFocus && focused.getAttribute("data-action");
-      fullscreenPending.hidden = app.role !== "host" || !pending.length;
+      fullscreenPending.hidden = app.role !== "host" || (!pending.length && !connecting && !unlisted && !app.hostJoinError);
       fullscreenList.innerHTML = "";
       if (app.role === "host") pending.forEach(function (g) {
         fullscreenList.appendChild(el("li", {}, [
@@ -3496,7 +3538,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.9";
+  var APP_VERSION = "2.6.10";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;

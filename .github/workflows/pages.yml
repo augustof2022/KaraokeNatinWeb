@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'web/**'
+      - 'services/turn-credentials/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -44,10 +45,13 @@ jobs:
           fi
           exit "${test_status[1]}"
       - name: Prepare static website
+        env:
+          TURN_CREDENTIALS_URL: ${{ vars.TURN_CREDENTIALS_URL }}
         run: |
           mkdir _site
           cp web/index.html web/manifest.webmanifest web/sw.js _site/
           cp -R web/css web/js web/icons _site/
+          node web/tools/write-connection-config.js _site/js/connection-config.js
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

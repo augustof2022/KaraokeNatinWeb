@@ -1,0 +1,7 @@
+{
+  "name": "karaokenatin-connections",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-01-01",
+  "vars": {"ALLOWED_ORIGIN": "https://augustof2022.github.io"},
+  "ratelimits": [{"name":"TURN_RATE_LIMITER","namespace_id":"1001","simple":{"limit":10,"period":60}}]
+}

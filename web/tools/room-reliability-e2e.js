@@ -53,6 +53,7 @@ async function main() {
               return link;
             };
             return {token:"test", onlineBrokers:function(){return 1;}, guests:function(){return links.filter(function(l){return l.isOpen();});},
+              connectingGuests:function(){return window.__connecting || [];},
               broadcast:function(){}, stop:function(){}, kick:function(id){links=links.filter(function(l){return l.id!==id;});}};
           };
         })();`;
@@ -62,7 +63,9 @@ async function main() {
           KN.player.create = function (id) {
             var frame = document.createElement("iframe"); frame.id = id; frame.src = window.__frameUrl;
             document.getElementById(id).replaceWith(frame);
-            var player = { on:function(){return player;}, load:function(){window.__playerCalls.load++;},
+            var events = {};
+            window.__finishSong = function () { (events.ended || []).forEach(function (fn) { fn(); }); };
+            var player = { on:function(name,fn){(events[name] = events[name] || []).push(fn); return player;}, load:function(){window.__playerCalls.load++;},
               play:function(){window.__playerCalls.play++;}, pause:function(){window.__playerCalls.pause++;},
               stop:function(){window.__playerCalls.stop++;}, seek:function(){window.__playerCalls.seek++;}, destroy:function(){window.__playerCalls.destroy++;},
               volume:function(){if(arguments.length)window.__playerCalls.volume++;}, mute:function(){if(arguments.length)window.__playerCalls.mute++;}, time:function(){return 0;}, duration:function(){return 213;}, meta:function(){return null;} };
@@ -82,6 +85,14 @@ async function main() {
     await host.locator("#fs-btn").click();
     await host.waitForFunction(() => document.fullscreenElement === document.getElementById("stage"));
     const before = await host.evaluate(() => JSON.stringify(window.__playerCalls));
+    await host.evaluate(() => { window.__connecting = [{}]; window.__hostEvents["guest-connecting"](); });
+    await host.locator("#fs-connection-status:not([hidden])").waitFor();
+    assert.equal(await host.locator("#fs-connection-status").textContent(), "1 guest is connecting…");
+    assert.equal(await host.locator("#fs-pending-list button").count(), 0, "a connection in progress cannot be approved before the guest arrives");
+    await host.evaluate(() => { window.__connecting = []; });
+    await host.evaluate(() => window.__hostEvents["guest-close"]({id:"failed"}, "relay-unavailable"));
+    assert.equal(await host.locator("#fs-pending").isVisible(), true, "the host sees connection failures in fullscreen");
+    assert.ok((await host.locator("#fs-connection-status").textContent()).includes("unavailable"));
     await host.evaluate(() => { window.__alice = window.__fakeJoin("alice", "Alice"); });
     await host.locator("#fs-pending:not([hidden])").waitFor();
     const joinBox = await host.locator("#fs-join").boundingBox();
@@ -159,6 +170,20 @@ async function main() {
     assert.equal(await host.locator("#cfg-tv-performance").isChecked(), true, "TV preference survives reload");
     console.log("  ok   TV mode reduces background checks and effects, releases idle probes, and preserves playback");
 
+    await host.evaluate(() => {
+      window.__scoreAudio = [];
+      KN.app.state.config.sounds = true;
+      ["whoosh","drumroll","tick","celebrate","chime","sparkle","blip","dingDong"].forEach(function (name) {
+        KN.sound[name] = function () { window.__scoreAudio.push(name); return {stop:function(){},crest:function(){}}; };
+      });
+      if (window.speechSynthesis) window.speechSynthesis.speak = function () { window.__scoreAudio.push("speech"); };
+      window.__finishSong();
+    });
+    await host.locator("#score-card.revealed").waitFor();
+    await host.waitForTimeout(1300);
+    assert.deepEqual(await host.evaluate(() => window.__scoreAudio), [], "score count-up, reaction and speech are silent even with room sounds enabled");
+    console.log("  ok   score generation keeps the animation and leaderboard without playing sounds or speech");
+
     const guestContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
     await guestContext.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     const guest = await guestContext.newPage();
@@ -175,6 +200,7 @@ async function main() {
     await guest.locator("#name-gate-input").fill("Singer");
     await guest.locator("#name-gate-form button[type=submit]").click();
     await guest.locator("#guest-reconnect:not([hidden])").waitFor();
+    assert.equal(await guest.locator("#guest-reconnect-title").textContent(), "Joining the room", "a first join is not described as disconnected");
     if (process.env.KN_SCREENSHOT_DIR) {
       await guest.waitForTimeout(500);
       await guest.screenshot({ path: path.join(process.env.KN_SCREENSHOT_DIR, "guest-reconnect.png") });
@@ -186,6 +212,7 @@ async function main() {
     assert.equal(await guest.evaluate(() => window.__guest.retries), 1);
     await guest.evaluate(() => { window.__guest.open = true; window.__guest.handlers.state("connected"); });
     assert.equal(await guest.locator("#guest-reconnect").isVisible(), true, "connection alone is not a fresh room snapshot");
+    await guest.waitForFunction(() => window.__guest.sent.some(m => m.type === "RESYNC"), null, {timeout:6000});
     await guest.evaluate(() => {
       const s = window.KN.room.createState("ABCDEF"); s.rev = 10;
       window.__guest.handlers.message({ type: "STATE", rev: 10, state: s });
@@ -193,6 +220,7 @@ async function main() {
     await guest.locator("#guest-reconnect").waitFor({ state: "hidden" });
     await guest.evaluate(() => window.__guest.handlers.checking("wake"));
     assert.equal(await guest.locator("#guest-reconnect").isVisible(), true, "a sleeping channel is verified before accepting actions");
+    assert.equal(await guest.locator("#guest-reconnect-title").textContent(), "Reconnecting to the room");
     await guest.evaluate(() => {
       window.__guest.handlers.wake();
       const s = window.KN.room.createState("ABCDEF"); s.rev = 10;

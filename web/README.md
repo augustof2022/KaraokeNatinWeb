@@ -112,6 +112,19 @@ Disconnected guests see a reconnecting screen with **Retry now** and **Leave roo
 Room controls return after the connection and a fresh host snapshot arrive. Actions
 attempted while disconnected are not queued or replayed.
 
+First-time guests see **Joining the room**, with progress through finding the
+host, connecting the devices, and loading the room. Retry preserves a handshake
+that is still in progress. The fullscreen host panel shows incoming connections
+before an approval request can arrive; approval buttons appear when the guest
+connection is ready.
+
+Wi-Fi-to-mobile connections can require a TURN relay. The shared public relay
+is a best-effort default. A dedicated Cloudflare TURN integration is prepared in
+[`services/turn-credentials`](../services/turn-credentials/README.md); it requires
+deployment to a Cloudflare account and the `TURN_CREDENTIALS_URL` Actions variable.
+It is inactive until configured. Never place the long-lived TURN API token in
+the website. Validate the activated relay on real mobile and Wi-Fi devices.
+
 ## Playback performance and buffering
 
 The host plays YouTube directly in the browser. Phone remotes and GitHub Pages
@@ -228,10 +241,8 @@ bug — and is skipped when they already said "karaoke" themselves. See `biasToK
 
 ## Scores
 
-A song that plays to the end gets a score on the stage — big, over the video, so it survives
-fullscreen where every panel in the app is off-screen — read aloud through the browser's own
-speech synthesis. No key, no network, no library: `speechSynthesis` is the one text-to-speech
-every browser already has, and a browser without it simply gets the card without the shouting.
+A song that plays to the end gets a score on the stage, including in fullscreen.
+Score generation is silent: no drumroll, ticking, reaction sounds, or spoken line.
 
 The number is weighted rather than uniform. A flat 65–100 hands out a 97 every third song and
 the score stops meaning anything, so the middle is where almost everyone lands, both extremes
@@ -239,15 +250,10 @@ are rare enough to be worth a reaction, and **101** exists so that once a night 
 the machine. **A skipped song is never scored** — half a chorus is not a performance, and
 scoring it would make every number in the room worthless within about four songs.
 
-The number does not simply appear. It **counts up** under a drumroll, easing out so it
-races through the seventies and then agonises over the last three, which is where a room
-actually makes noise. Then the leaderboard slides in underneath and *moves* the singer to
-their new place rather than arriving already sorted — "you went up two" is worth watching
-happen. Both the drumroll and the roulette's ticking are synthesised in
-[`js/sound.js`](js/sound.js) from an oscillator and a buffer of noise: a few hundred bytes
-of code instead of a few hundred KB of WAV, and nothing to 404 on a bad connection
-mid-spin. A browser with no Web Audio gets the animation in silence, which is the correct
-failure.
+The number counts up, easing out near the final score. The leaderboard then
+slides in and moves the singer to their new place. Animations and confetti
+remain available. The Room sounds setting controls other room effects;
+enabling it does not re-enable score audio.
 
 Scores stack up in a session leaderboard (best score, then average) under **Scores**. Both the
 scoring and the leaderboard are on by default and can be switched off by the host under

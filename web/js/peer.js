@@ -58,12 +58,46 @@
     iceCandidatePoolSize: 2
   };
 
+  // Only the expiring connection credentials reach the browser.
+  var relayEndpoint = global.KN_TURN_ENDPOINT || "";
+  var relayPending = null, relayCached = null, relayCachedAt = 0;
+  function relayConfig() {
+    if (!relayEndpoint) return Promise.resolve(null);
+    if (relayCached && Date.now() - relayCachedAt < 300000) return Promise.resolve(relayCached);
+    if (relayPending) return relayPending;
+    var controller = typeof global.AbortController === "function" ? new global.AbortController() : null;
+    var timer;
+    var timeout = new Promise(function (_, reject) {
+      timer = setTimeout(function () { if (controller) controller.abort(); reject(new Error("relay-unavailable")); }, 9000);
+    });
+    var request = Promise.resolve().then(function () {
+      return global.fetch(relayEndpoint, {mode:"cors",cache:"no-store",credentials:"omit",signal:controller ? controller.signal : undefined});
+    }).then(function (response) {
+      if (!response.ok) throw new Error("relay-unavailable");
+      return response.json();
+    }).then(function (data) {
+      var servers = data && data.iceServers;
+      if (!Array.isArray(servers) || !servers.some(function (s) {
+        var urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+        return typeof s.username === "string" && typeof s.credential === "string" && urls.some(function (u) { return typeof u === "string" && /^turns?:/.test(u); });
+      })) throw new Error("relay-unavailable");
+      relayCached = {iceServers:servers,iceCandidatePoolSize:2};
+      relayCachedAt = Date.now();
+      return relayCached;
+    });
+    relayPending = Promise.race([request,timeout]).then(function (config) {
+      clearTimeout(timer); relayPending = null; return config;
+    }, function () { clearTimeout(timer); relayPending = null; throw new Error("relay-unavailable"); });
+    return relayPending;
+  }
+
   var HEARTBEAT_MS = 5000;        // broker keep-alive + data-channel ping
   var SILENCE_MS = 60000;         // allow background throttling and Wi-Fi handovers
   var PROBE_MS = 10000;           // a returning phone may need time to resume
   var ICE_GRACE_MS = 20000;       // "disconnected" often heals; give it a moment
-  var OFFER_TIMEOUT_MS = 12000;   // per-attempt ceiling for reaching the host
-  var ANSWER_OPEN_MS = 8000;      // answer accepted but channel never opened
+  var BROKER_TIMEOUT_MS = 12000; // signalling service must answer promptly
+  var OFFER_TIMEOUT_MS = 20000;  // time to find the host and receive its answer
+  var ANSWER_OPEN_MS = 30000;    // mobile/TURN connections need time after SDP
   var SOCKET_STALE_MS = 25000;    // signalling socket idle this long => recycle
   var TIMESKIP_MS = 8000;         // clock jump that means the machine slept
   var SOFT_REOFFERS = 3;          // re-asks on one broker before moving on
@@ -367,7 +401,7 @@
    */
   function Link(opts) {
     var self = emitter({});
-    var pc = new RTCPeerConnection(ICE);
+    var pc = new RTCPeerConnection(relayEndpoint ? {iceServers:[],iceCandidatePoolSize:0} : ICE);
     var dc = null;
     var pending = [];      // ICE candidates received before setRemoteDescription
     var remoteSet = false;
@@ -514,16 +548,16 @@
     }
 
     self.createOffer = function () {
-      return pc
-        .createOffer()
+      return configureRelay()
+        .then(function () { return pc.createOffer(); })
         .then(function (offer) { return pc.setLocalDescription(offer); })
         .then(function () { return waitForIce(); })
         .then(function () { return pc.localDescription; });
     };
 
     self.acceptOffer = function (sdp) {
-      return pc
-        .setRemoteDescription(new RTCSessionDescription(sdp))
+      return configureRelay()
+        .then(function () { return pc.setRemoteDescription(new RTCSessionDescription(sdp)); })
         .then(function () { remoteSet = true; drain(); return pc.createAnswer(); })
         .then(function (answer) { return pc.setLocalDescription(answer); })
         .then(function () { return waitForIce(); })
@@ -538,6 +572,13 @@
     };
 
     self.signalingState = function () { return pc.signalingState; };
+
+    function configureRelay() {
+      return relayConfig().then(function (config) {
+        if (dead) throw new Error("closed");
+        if (config) pc.setConfiguration(config);
+      });
+    }
 
     self.addCandidate = function (cand) {
       if (!remoteSet) { pending.push(cand); return; }
@@ -674,19 +715,25 @@
           old.destroy("replaced");
         }
 
+        var localCandidates = [];
         var link = Link({
           initiator: false,
           connectionId: cid,
           remote: msg.src,
           onCandidate: function (c) {
+            if (!link || !link.answer) { localCandidates.push(c); return; }
             broker.send("CANDIDATE", msg.src, { candidate: c, connectionId: cid, negotiationId: p.negotiationId, type: "data" });
           }
         });
         link.offerSdp = p.sdp.sdp;
         link.negotiationId = p.negotiationId;
         links[cid] = link;
+        self.emit("guest-connecting", link);
+        var connectTimer = setTimeout(function () {
+          if (links[cid] === link && !link.isOpen()) link.destroy("connect-timeout");
+        }, ANSWER_OPEN_MS + 15000);
 
-        link.on("open", function () { if (links[cid] === link) self.emit("guest-open", link); });
+        link.on("open", function () { clearTimeout(connectTimer); if (links[cid] === link) self.emit("guest-open", link); });
         link.on("message", function (data) {
           if (links[cid] === link) self.emit("guest-message", link, data);
         });
@@ -694,6 +741,7 @@
           if (links[cid] === link) self.emit("guest-restored", link);
         });
         link.on("close", function (reason) {
+          clearTimeout(connectTimer);
           if (links[cid] !== link) return;   // already replaced; not a departure
           delete links[cid];
           self.emit("guest-close", link, reason);
@@ -710,10 +758,14 @@
               type: "data"
             };
             broker.send("ANSWER", msg.src, link.answer);
+            localCandidates.splice(0).forEach(function (c) {
+              broker.send("CANDIDATE", msg.src, { candidate:c, connectionId:cid, negotiationId:p.negotiationId, type:"data" });
+            });
           })
           .catch(function (e) {
+            if (stopped || links[cid] !== link) return;
             console.warn("[kn] answer failed", e);
-            link.destroy("answer-failed");
+            link.destroy(e.message === "relay-unavailable" ? "relay-unavailable" : "answer-failed");
           });
       } else if (msg.type === "CANDIDATE") {
         var current = links[cid];
@@ -743,6 +795,10 @@
       return Object.keys(links)
         .map(function (k) { return links[k]; })
         .filter(function (l) { return l.isOpen(); });
+    };
+
+    self.connectingGuests = function () {
+      return Object.keys(links).map(function (k) { return links[k]; }).filter(function (l) { return !l.isOpen(); });
     };
 
     /* Kicking is two things, and only doing the first is why "removed" guests
@@ -814,6 +870,9 @@
     self.code = normalizeCode(code);
     self.connectionId = connectionId;
     self.state = "connecting";
+    self.phase = "broker";
+
+    function setPhase(phase) { self.phase = phase; self.emit("progress", phase); }
 
     function setState(s, detail) {
       self.state = s;
@@ -835,12 +894,13 @@
       if (a.broker) a.broker.close();
     }
 
-    function armTimeout(a, ms) {
+    function armTimeout(a, ms, reason) {
       clearTimeout(a.timer);
       if (stopped || att !== a || a.gen !== gen || a.connected) return;
+      a.deadline = Date.now() + (ms || OFFER_TIMEOUT_MS);
       a.timer = setTimeout(function () {
         if (a.gen !== gen || a.connected || (a.link && a.link.isOpen())) return;
-        fail("timeout");
+        fail(reason || "host-unreachable");
       }, ms || OFFER_TIMEOUT_MS);
     }
 
@@ -863,21 +923,26 @@
         connected: false,
         timer: null,
         soft: null,
+        candidates: [],
+        offerSent: false,
+        answered: false,
         startedAt: Date.now()
       };
       att = a;
       setState("connecting", cfg.host);
+      setPhase("broker");
 
       a.broker = Broker(cfg, function () { return a.myId; }, rid(12));
-      armTimeout(a);
+      armTimeout(a, BROKER_TIMEOUT_MS, "broker-unavailable");
 
       a.broker.on("open", function () {
         if (a.gen !== gen) return;
+        setPhase("host");
         // The socket can open more than once — it reconnects underneath us.
         // A second OPEN must not build a second link; re-asking with the offer
         // we already have is both cheaper and correct.
         if (!a.link) buildLink(a);
-        else if (!a.link.isOpen() && a.offer) sendOffer(a);
+        else if (!a.link.isOpen() && a.offer && !a.answered) sendOffer(a);
       });
 
       a.broker.on("id-taken", function () {
@@ -896,7 +961,12 @@
           // connection and throw; only the one we are still waiting for counts.
           if (a.link.signalingState() !== "have-local-offer") return;
           a.link.acceptAnswer(p.sdp).then(
-            function () { if (att === a) armTimeout(a, ANSWER_OPEN_MS); },
+            function () {
+              if (att !== a) return;
+              a.answered = true;
+              if (!a.connected) setPhase("peer");
+              armTimeout(a, ANSWER_OPEN_MS, "peer-timeout");
+            },
             function () { if (att === a) fail("answer-rejected"); }
           );
         } else if (msg.type === "CANDIDATE" && a.link) {
@@ -911,11 +981,13 @@
     }
 
     function buildLink(a) {
+      if (relayEndpoint) setPhase("relay");
       var l = Link({
         initiator: true,
         connectionId: connectionId,
         remote: target,
         onCandidate: function (c) {
+          if (!a.offerSent) { a.candidates.push(c); return; }
           a.broker.send("CANDIDATE", target, { candidate: c, connectionId: connectionId, negotiationId: a.myId, type: "data" });
         }
       });
@@ -928,6 +1000,7 @@
         a.connected = true;
         attempt = 0;
         lastGood = brokerIndex;
+        setPhase("sync");
         setState("connected", a.cfg.host);
         self.emit("open");
       });
@@ -957,9 +1030,10 @@
         .then(function (offer) {
           if (a.gen !== gen) return;
           a.offer = { type: offer.type, sdp: offer.sdp };
+          setPhase("host");
           sendOffer(a);
         })
-        .catch(function () { if (a.gen === gen) fail("offer-failed"); });
+        .catch(function (e) { if (a.gen === gen) fail(e.message === "relay-unavailable" ? "relay-unavailable" : "offer-failed"); });
     }
 
     function sendOffer(a) {
@@ -973,6 +1047,10 @@
         reliable: true,
         serialization: "json",
         browser: "kn"
+      });
+      a.offerSent = true;
+      a.candidates.splice(0).forEach(function (c) {
+        a.broker.send("CANDIDATE", target, {candidate:c, connectionId:connectionId, negotiationId:a.myId, type:"data"});
       });
       armTimeout(a);
     }
@@ -1044,7 +1122,7 @@
 
       // Focus/online/visibility events arrive in bursts. Let a recent handshake
       // finish; repeatedly replacing it can prevent the connection ever opening.
-      if (a && Date.now() - a.startedAt < OFFER_TIMEOUT_MS) {
+      if (a && Date.now() < a.deadline) {
         if (a.broker) a.broker.check();
         return;
       }
@@ -1063,6 +1141,8 @@
     self.retryNow = function () {
       if (stopped) return;
       if (self.isOpen()) { onWake("retry"); return; }
+      // Repeated taps must not tear down a mobile relay still negotiating.
+      if (att && Date.now() < att.deadline) { if (att.broker) att.broker.check(); return; }
       attempt = 0;
       brokerIndex = lastGood;
       startAttempt();

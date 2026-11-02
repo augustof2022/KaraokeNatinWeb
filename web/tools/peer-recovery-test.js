@@ -10,7 +10,7 @@ const crypto = require("node:crypto");
 const source = fs.readFileSync(require.resolve("../js/peer.js"), "utf8");
 
 async function flush() { for (let i = 0; i < 20; i++) await Promise.resolve(); }
-function harness() {
+function harness(options = {}) {
   let now = 100000, sequence = 0;
   const timers = new Map(), sockets = [], pcs = [], events = {};
   function schedule(fn, ms, interval) {
@@ -36,9 +36,13 @@ function harness() {
     constructor() { this.iceGatheringState = "complete"; this.signalingState = "stable"; this.candidates = []; pcs.push(this); }
     createDataChannel() { return this.dc = new Channel(); }
     incoming() { this.dc = new Channel(); this.ondatachannel({ channel: this.dc }); this.dc.open(); }
-    async createOffer() { return { type: "offer", sdp: "offer-" + pcs.indexOf(this) }; }
-    async createAnswer() { return { type: "answer", sdp: "answer-" + pcs.indexOf(this) }; }
-    async setLocalDescription(sdp) { this.localDescription = sdp; this.signalingState = sdp.type === "offer" ? "have-local-offer" : "stable"; }
+    setConfiguration(config) { this.config=config; }
+    async createOffer() { if(options.relay) assert.ok(this.config, "relay configured before offer"); return { type: "offer", sdp: "offer-" + pcs.indexOf(this) }; }
+    async createAnswer() { if(options.relay) assert.ok(this.config, "relay configured before answer"); return { type: "answer", sdp: "answer-" + pcs.indexOf(this) }; }
+    async setLocalDescription(sdp) {
+      this.localDescription = sdp; this.signalingState = sdp.type === "offer" ? "have-local-offer" : "stable";
+      if (options.trickleEarly && this.onicecandidate) this.onicecandidate({candidate:{candidate:"early", toJSON(){return {candidate:"early"};}}});
+    }
     async setRemoteDescription() { this.signalingState = "stable"; }
     async addIceCandidate(c) { this.candidates.push(c); }
     close() { this.closed = true; }
@@ -46,6 +50,8 @@ function harness() {
   const document = { hidden: false, addEventListener(name, fn) { (events[name] ||= []).push(fn); } };
   const context = vm.createContext({
     console, crypto: crypto.webcrypto, Uint8Array, Promise, Math,
+    KN_TURN_ENDPOINT: options.relay ? "https://relay.example/ice" : "",
+    fetch: async () => ({ok:!options.relayFails,json:async()=>({iceServers:[{urls:["turns:turn.example:443?transport=tcp"],username:"short-lived",credential:"temporary"}]})}),
     Date: { now: () => now }, document,
     KN_BROKERS: [{ host: "local-broker", port: 1234, path: "/", key: "peerjs" }],
     WebSocket: Socket, RTCPeerConnection: PC,
@@ -93,6 +99,74 @@ test("focus and network events preserve an in-flight handshake", async () => {
   assert.equal(h.sockets.length, 1);
   assert.equal(h.pcs[0].closed, undefined);
   guest.stop();
+});
+
+test("a slow mobile connection survives Retry and wake events after the answer", async () => {
+  const h = harness();
+  const guest = await guestAttempt(h);
+  const sent = h.sockets[0].sent.find(m => m.type === "OFFER");
+  h.sockets[0].receive({type:"ANSWER", payload:{...sent.payload, sdp:{type:"answer",sdp:"ok"}}});
+  await flush();
+  assert.equal(guest.phase, "peer");
+  await h.advance(15000);
+  for (let i=0;i<8;i++) {guest.retryNow(); h.event("focus");}
+  await h.advance(9000);
+  assert.equal(h.pcs.length, 1);
+  assert.equal(h.pcs[0].closed, undefined);
+  h.pcs[0].dc.open();
+  assert.equal(guest.state, "connected");
+  guest.stop();
+});
+
+test("configured relay credentials are applied before either side negotiates", async()=>{
+  const h=harness({relay:true});
+  const guest=await guestAttempt(h); await flush();
+  assert.equal(h.pcs[0].config.iceServers[0].username,"short-lived");
+  guest.stop();
+  const host=h.net.host("ABC234"); h.sockets.at(-1).open(); h.sockets.at(-1).receive(offer());
+  await flush();
+  assert.equal(h.pcs.at(-1).config.iceServers[0].urls[0],"turns:turn.example:443?transport=tcp");
+  host.stop();
+});
+
+test("a configured relay outage reports failure rather than silently using the public relay", async()=>{
+  const h=harness({relay:true,relayFails:true});
+  const reasons=[];
+  const guest=h.net.join("ABC234",{state:(s,reason)=>{if(s==="retrying")reasons.push(reason);}});
+  h.sockets[0].open(); await flush();
+  assert.ok(reasons.includes("relay-unavailable"));
+  assert.equal(h.sockets[0].sent.some(m=>m.type==="OFFER"),false);
+  guest.stop();
+});
+
+test("a failed device connection eventually retries with a useful reason", async () => {
+  const h=harness();
+  const guest=await guestAttempt(h);
+  const reasons=[]; guest.on("state", (s,reason)=>{if(s==="retrying")reasons.push(reason);});
+  const sent=h.sockets[0].sent.find(m=>m.type==="OFFER");
+  h.sockets[0].receive({type:"ANSWER",payload:{...sent.payload,sdp:{type:"answer",sdp:"ok"}}});
+  await flush(); await h.advance(31000);
+  assert.equal(h.pcs[0].closed,true);
+  assert.ok(reasons.includes("peer-timeout"));
+  guest.stop();
+});
+
+test("SDP is sent before early ICE candidates and the host reports pending connections", async () => {
+  const g=harness({trickleEarly:true});
+  const guest=await guestAttempt(g);
+  assert.deepEqual(g.sockets[0].sent.filter(m=>m.type!=="HEARTBEAT").map(m=>m.type),["OFFER","CANDIDATE"]);
+  guest.stop();
+  const h=harness({trickleEarly:true});
+  let incoming=0;
+  const host=h.net.host("ABC234",{on:{"guest-connecting":()=>incoming++}});
+  h.sockets[0].open(); h.sockets[0].receive(offer());
+  await flush();
+  assert.equal(incoming,1);
+  assert.equal(host.connectingGuests().length,1);
+  assert.deepEqual(h.sockets[0].sent.filter(m=>m.type!=="HEARTBEAT").map(m=>m.type),["ANSWER","CANDIDATE"]);
+  h.pcs[0].incoming();
+  assert.equal(host.connectingGuests().length,0);
+  host.stop();
 });
 
 test("wake events also preserve the initial broker WebSocket handshake", async () => {

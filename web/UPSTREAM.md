@@ -22,6 +22,8 @@ Fork changes:
 - Keep playback-clock updates lightweight and expose YouTube’s native quality controls.
 - Add fullscreen join approvals, disconnected-guest protection, and local TV performance mode.
 - Keep the windowed video visible on older browsers and place host controls below it.
+- Silence score reveals, report joining progress, preserve slow handshakes on Retry,
+  and support a separately deployed service for dedicated TURN credentials.
 - Publish only static runtime assets through `.github/workflows/pages.yml`.
 
 The upstream browser code and the native app have separate implementations.
