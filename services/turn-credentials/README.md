@@ -9,6 +9,21 @@ This requires a Cloudflare account with Realtime TURN enabled. Review its
 current usage allowance/pricing before deploying. No Cloudflare credentials
 are currently configured in this repository or the cloud environment.
 
+## Deploy from the browser (no local checkout)
+
+1. Sign up at Cloudflare and open **Workers & Pages** once, so your
+   `workers.dev` subdomain exists.
+2. **Realtime → TURN Server → Create**. Copy the key's **ID** and **API token**.
+3. **My Profile → API Tokens → Create Token**, template **Edit Cloudflare
+   Workers**. Copy the token. Copy your **Account ID** from the dashboard home.
+4. In this GitHub repository: **Settings → Secrets and variables → Actions →
+   Secrets**, add `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
+   `CF_TURN_KEY_ID` and `CF_TURN_API_TOKEN`.
+5. **Actions → Deploy mobile-data relay (Cloudflare) → Run workflow**. The run
+   summary shows the `/ice` URL. Continue from step 4 below.
+
+## Deploy from a local checkout
+
 1. In Cloudflare Realtime TURN, create a TURN key. Keep its key ID and API token
    on the service side. See the official [credential guide](https://developers.cloudflare.com/realtime/turn/generate-credentials/).
 2. From this directory, authenticate Wrangler with your own Cloudflare account

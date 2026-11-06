@@ -1,0 +1,95 @@
+name: Deploy mobile-data relay (Cloudflare)
+
+# Deploys services/turn-credentials to Cloudflare from GitHub, so no local
+# checkout is needed. Run it by hand from the Actions tab. It needs these
+# repository secrets (Settings → Secrets and variables → Actions → Secrets):
+#   CLOUDFLARE_API_TOKEN   token from the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID  shown on the Cloudflare dashboard home page
+#   CF_TURN_KEY_ID         Realtime → TURN → your TURN key's ID
+#   CF_TURN_API_TOKEN      that TURN key's API token
+# See services/turn-credentials/README.md.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: turn-relay
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/turn-credentials
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_TURN_KEY_ID: ${{ secrets.CF_TURN_KEY_ID }}
+      CF_TURN_API_TOKEN: ${{ secrets.CF_TURN_API_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check required secrets
+        run: |
+          missing=""
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CF_TURN_KEY_ID CF_TURN_API_TOKEN; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error title=Missing repository secrets::Add these under Settings → Secrets and variables → Actions:$missing"
+            exit 1
+          fi
+
+      - name: Test worker
+        run: node --test worker.test.mjs
+
+      - name: Deploy worker
+        run: |
+          set -o pipefail
+          npx --yes wrangler@4.156.1 deploy 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+
+      - name: Store TURN key in worker secrets
+        run: |
+          printf '%s' "$CF_TURN_KEY_ID" | npx --yes wrangler@4.156.1 secret put CF_TURN_KEY_ID
+          printf '%s' "$CF_TURN_API_TOKEN" | npx --yes wrangler@4.156.1 secret put CF_TURN_API_TOKEN
+
+      - name: Verify relay and report its URL
+        run: |
+          base="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | head -n 1)"
+          if [ -z "$base" ]; then
+            echo "::error title=No workers.dev URL::Open Workers & Pages in the Cloudflare dashboard once to create your workers.dev subdomain, then rerun."
+            exit 1
+          fi
+          # Secrets can take a few seconds to reach every edge location.
+          ok=""
+          for attempt in 1 2 3 4 5 6; do
+            health="$(curl -sS --max-time 10 "$base/health" || true)"
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -H 'Origin: https://augustof2022.github.io' "$base/ice" || true)"
+            echo "Attempt $attempt: /health=$health /ice=HTTP $code"
+            if [ "$health" = "OK" ] && [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 10
+          done
+          {
+            echo "## Mobile-data relay"
+            echo
+            echo "Set the repository **variable** \`TURN_CREDENTIALS_URL\` to:"
+            echo
+            echo "\`\`\`"
+            echo "$base/ice"
+            echo "\`\`\`"
+            echo
+            echo "Then rerun **Deploy website to GitHub Pages**."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$ok" ]; then
+            echo "::error title=Relay not answering::/ice did not return 200. Check that CF_TURN_KEY_ID and CF_TURN_API_TOKEN belong to a Realtime TURN key."
+            exit 1
+          fi
+          echo "Relay is live: $base/ice"
