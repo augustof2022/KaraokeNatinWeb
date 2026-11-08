@@ -68,7 +68,11 @@
        * enough tries. Approval is what turns "anyone who guesses the code is
        * in" into "anyone who guesses the code is in a lobby". */
       joinApproval: true,
-      sounds: true          // the ticks, the drumroll, the chime
+      sounds: true,         // the ticks, the drumroll, the chime
+      /* Search mode for every phone in the room. On: karaoke tracks only (the
+       * query is biased towards karaoke and music videos are filtered out).
+       * Off: plain YouTube search, anything that can play in the embed. */
+      karaokeOnly: true
     };
   }
 

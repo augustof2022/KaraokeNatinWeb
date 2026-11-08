@@ -292,13 +292,16 @@
   }
 
   /**
-   * Search both tiers. Resolves with { results, source } or rejects with an
+   * Search both tiers. `opts.karaokeOnly === false` sends the query unbiased.
+   * Resolves with { results, source } or rejects with an
    * Error whose message is safe to show the user.
    */
-  function search(query, attempt) {
+  function search(query, attempt, opts) {
     var raw = String(query || "").trim();
     if (!raw) return Promise.resolve({ results: [], source: null });
-    var q = variantQuery(raw, attempt || 0);
+    // A room set to "all of YouTube" asks for exactly what was typed.
+    var karaoke = !(opts && opts.karaokeOnly === false);
+    var q = karaoke ? variantQuery(raw, attempt || 0) : raw;
 
     return hedge(ordered(PIPED, "piped"), function (base) {
       return getJSON(base + "/search?q=" + encodeURIComponent(q) + "&filter=videos").then(function (data) {

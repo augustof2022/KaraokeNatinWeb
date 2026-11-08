@@ -2472,7 +2472,8 @@
     "cfg-leaderboard": "leaderboard",
     "cfg-maxrun": "maxRun",
     "cfg-approval": "joinApproval",
-    "cfg-sounds": "sounds"
+    "cfg-sounds": "sounds",
+    "cfg-karaoke": "karaokeOnly"
   };
 
   function renderConfig() {
@@ -2753,7 +2754,10 @@
       unsure: 0,      // shown, but the probe never actually answered
       notKaraoke: 0,  // almost certainly not something anyone can sing to
       round: 0,
-      source: null
+      source: null,
+      /* The room's search mode, set by the host under Setup. Outside a room
+       * (or before the first snapshot) it is karaoke, the app's default. */
+      karaokeOnly: !(app.state && app.state.config && app.state.config.karaokeOnly === false)
     };
     app.searchRun = run;
 
@@ -2763,6 +2767,11 @@
       if (stopped()) return;
       app.searchBusy = false;
       app.searchSweep = null;
+      if (!run.shown && !run.karaokeOnly) {
+        status.textContent =
+          "Nothing playable came back. Try different words, or paste a YouTube link.";
+        return;
+      }
       if (!run.shown) {
         status.textContent =
           "Nothing here can be sung to. " +
@@ -2775,6 +2784,7 @@
         (run.unsure ? " · " + run.unsure + " unchecked" : "") +
         (run.dropped ? " · " + run.dropped + " cannot be embedded" : "") +
         (run.notKaraoke ? " · " + run.notKaraoke + " not karaoke" : "") +
+        (run.karaokeOnly ? "" : " · all YouTube") +
         (run.source ? " · " + run.source : "");
     }
 
@@ -2782,7 +2792,7 @@
       if (stopped()) return;
       run.round++;
       KN.search
-        .search(q, run.round - 1)
+        .search(q, run.round - 1, { karaokeOnly: run.karaokeOnly })
         .then(function (out) {
           if (stopped()) return;
           run.source = out.source;
@@ -2794,7 +2804,7 @@
           out.results.forEach(function (v) {
             if (run.seen[v.id]) return;
             run.seen[v.id] = true;
-            if (KN.search.karaokeVerdict(v) === "no") { run.notKaraoke++; return; }
+            if (run.karaokeOnly && KN.search.karaokeVerdict(v) === "no") { run.notKaraoke++; return; }
             fresh.push(v);
           });
 
@@ -2841,7 +2851,9 @@
 
     function nextRound() {
       if (stopped()) return;
-      if (run.shown >= SEARCH_TARGET || run.round >= SEARCH_ROUNDS) { finish(); return; }
+      /* The extra rounds re-ask in karaoke phrasings, so they only make sense
+       * in karaoke mode; a plain search takes the mirror's one page as-is. */
+      if (!run.karaokeOnly || run.shown >= SEARCH_TARGET || run.round >= SEARCH_ROUNDS) { finish(); return; }
       status.textContent = "Only " + run.shown + " so far — looking a bit harder…";
       round();
     }

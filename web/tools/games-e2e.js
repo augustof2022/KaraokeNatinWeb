@@ -210,6 +210,29 @@ async function main() {
   await admit(host, "Maria");
   await guest.waitForSelector("#lobby-wait", { state: "hidden", timeout: 20000 });
 
+  /* ── "all of YouTube" search mode ─────────────────────────────────────── */
+  check("rooms start in karaoke-only search", await host.isChecked("#cfg-karaoke"));
+  await host.click('.tab[data-tab="config"]');
+  await host.uncheck("#cfg-karaoke");
+  await guest.waitForFunction(() => window.KN.app.state.config.karaokeOnly === false, null, { timeout: 20000 });
+  check("the host's search mode reaches the guest", true);
+
+  queries.length = 0;
+  await guest.click('.tab[data-tab="search"]');
+  await guest.fill("#q", "anak");
+  await guest.click("#search-form button[type=submit]");
+  await guest.waitForFunction(() => window.KN.app.searchBusy === false, null, { timeout: 30000 });
+  const allTitles = await guest.locator("#results .row-title").allTextContents();
+  check("all-YouTube mode keeps the music video", allTitles.some((t) => /Official Music Video/.test(t)), allTitles.join(" | "));
+  check("and every result", allTitles.length === 5, String(allTitles.length));
+  const plain = [...new Set(queries.map((u) => (u.split("q=")[1] || "").split("&")[0]))];
+  check("the query goes out exactly as typed", plain.length === 1 && plain[0] === "anak", JSON.stringify(plain));
+  check("the status says which mode it searched in", /all YouTube/.test(await guest.textContent("#search-status")));
+
+  await host.check("#cfg-karaoke");
+  await guest.waitForFunction(() => window.KN.app.state.config.karaokeOnly === true, null, { timeout: 20000 });
+  check("turning it back on restores karaoke search", true);
+
   await host.click('.tab[data-tab="games"]');
   /* The tab is a menu of tiles now; the roulette opens from its own. On a wide
    * screen it opens beside the player rather than over it, which is what this
