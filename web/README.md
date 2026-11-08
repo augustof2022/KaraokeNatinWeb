@@ -170,6 +170,20 @@ exhausted the app says search is unavailable rather than spinning — and **past
 link always works**, since that path needs no mirror at all (title lookup falls back through
 YouTube's own oembed, then Piped, then Invidious, then a bare playable entry).
 
+### Karaoke only, or all of YouTube
+
+**Setup → Karaoke tracks only** (on by default) sets the search mode for every phone
+in the room. On, search behaves as described below: the query is biased towards
+karaoke, music videos and clips are hidden, and thin lists are topped up with
+karaoke phrasings. Off, the query goes to the mirror exactly as typed and every
+result that can play in the embed is shown, so the room can queue any video.
+Karaoke tracks are still badged in both modes. Only the host and co-hosts can
+change it.
+
+Search does not go through the room: each phone asks the public mirrors
+directly, so a search that comes back empty says nothing about the room's
+connection.
+
 ### Only what can actually play
 
 A mirror returns plenty of videos the host screen can never show: the owner
