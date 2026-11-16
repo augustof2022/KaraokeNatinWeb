@@ -132,6 +132,12 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's default list includes the legacy `tools` package,
+          # which current sdkmanager (cmdline-tools 16+) no longer has, so the
+          # step failed with "Failed to find package 'tools'". The NDK is
+          # installed by the next step; Gradle fetches any missing platform.
+          packages: 'platform-tools'
 
       - name: Install Android NDK
         run: |

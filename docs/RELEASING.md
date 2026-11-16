@@ -28,6 +28,8 @@ This exact file has one confirmed successful run: [21795050307](https://github.c
 
 The Android job's original failure — `npm error could not determine executable to run` — was diagnosed and fixed after this restore. Root cause: the job ran `npx tauri android ...`, and `npx` on this project resolves against the npm registry rather than the locally installed `@tauri-apps/cli`, because this is a pnpm-managed workspace with no npm lockfile for `npx`'s local-bin check to key off. Reproducible directly: `npx tauri --version` fails with that exact error, `pnpm exec tauri --version` succeeds instantly. The Windows job never hit this because it invokes Tauri through `pnpm --filter ... run tauri:build` — pnpm's own script runner, not `npx` — which is very likely why Windows is this workflow's only recorded success and Android never has been, even six months ago. Fixed by swapping both `npx tauri android ...` calls to `pnpm exec tauri android ...`; nothing else about the job changed.
 
+The next failure was in `Setup Android SDK`, before any project code ran: `Warning: Failed to find package 'tools'`, then sdkmanager exiting 1. `android-actions/setup-android@v3` installs `tools platform-tools` by default, and the legacy `tools` package no longer exists in the cmdline-tools 16 the runners ship. Fixed by passing `packages: 'platform-tools'` to that step.
+
 ## Running it
 
 Push to `main`/`master`, open a PR against them, or use **Actions → Build Release → Run workflow** for a manual run. Artifacts appear on the run's summary page once each job finishes.

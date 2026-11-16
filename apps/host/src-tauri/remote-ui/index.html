@@ -859,6 +859,209 @@
             }
         }
 
+        /* Connecting (joining the room) */
+        .connecting-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: 24px;
+            padding-top: calc(24px + env(safe-area-inset-top));
+            padding-bottom: calc(24px + env(safe-area-inset-bottom));
+            text-align: center;
+        }
+
+        .connect-visual {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .connect-ring {
+            position: absolute;
+            inset: 30px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            opacity: 0;
+            animation: connect-ripple 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+        }
+
+        .connect-ring:nth-child(2) {
+            animation-delay: 0.8s;
+        }
+
+        .connect-ring:nth-child(3) {
+            animation-delay: 1.6s;
+        }
+
+        @keyframes connect-ripple {
+            0% {
+                transform: scale(0.85);
+                opacity: 0.55;
+            }
+
+            100% {
+                transform: scale(1.6);
+                opacity: 0;
+            }
+        }
+
+        .connect-mic {
+            position: relative;
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(29, 161, 242, 0.35);
+            animation: connect-bob 1.6s ease-in-out infinite;
+        }
+
+        @keyframes connect-bob {
+
+            0%,
+            100% {
+                transform: translateY(0) rotate(-4deg);
+            }
+
+            50% {
+                transform: translateY(-6px) rotate(4deg);
+            }
+        }
+
+        .connect-note {
+            position: absolute;
+            bottom: 40px;
+            color: var(--accent);
+            font-size: 22px;
+            line-height: 1;
+            opacity: 0;
+            animation: connect-float 3s ease-out infinite;
+        }
+
+        .connect-note.n1 {
+            left: 18px;
+        }
+
+        .connect-note.n2 {
+            right: 16px;
+            font-size: 18px;
+            animation-delay: 1s;
+        }
+
+        .connect-note.n3 {
+            left: 50%;
+            font-size: 16px;
+            animation-delay: 2s;
+        }
+
+        @keyframes connect-float {
+            0% {
+                transform: translateY(0) scale(0.7);
+                opacity: 0;
+            }
+
+            20% {
+                opacity: 0.9;
+            }
+
+            100% {
+                transform: translateY(-90px) scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        .connect-eq {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 22px;
+            margin-bottom: 20px;
+        }
+
+        .connect-eq span {
+            width: 4px;
+            height: 100%;
+            border-radius: 2px;
+            background: var(--accent);
+            transform-origin: bottom;
+            animation: connect-eq 1s ease-in-out infinite;
+        }
+
+        .connect-eq span:nth-child(2) { animation-delay: -0.8s; }
+        .connect-eq span:nth-child(3) { animation-delay: -0.4s; }
+        .connect-eq span:nth-child(4) { animation-delay: -0.6s; }
+        .connect-eq span:nth-child(5) { animation-delay: -0.2s; }
+
+        @keyframes connect-eq {
+
+            0%,
+            100% {
+                transform: scaleY(0.25);
+            }
+
+            50% {
+                transform: scaleY(1);
+            }
+        }
+
+        .connect-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .connect-status {
+            color: var(--text-secondary);
+            font-size: 15px;
+            min-height: 1.4em;
+        }
+
+        .connect-hint {
+            margin-top: 16px;
+            max-width: 280px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.5;
+            opacity: 0.8;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            .connect-ring,
+            .connect-note {
+                animation: none;
+                opacity: 0;
+            }
+
+            .connect-mic,
+            .connect-eq span {
+                animation-duration: 3s;
+            }
+        }
+
+        .link-btn {
+            margin-top: 12px;
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -973,6 +1176,9 @@
         }
 
         .retry-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             margin-top: 24px;
             padding: 12px 32px;
             border-radius: 9999px;
@@ -1173,6 +1379,17 @@
             reconnectAttempts: 0,
             maxReconnectAttempts: 5,
             reconnecting: false,
+            // Which step of the join handshake we're on, for the connecting screen:
+            // 'server' (reaching the host app), 'room' (joining), 'host' (opening
+            // the data channel to the host).
+            connectStage: 'server',
+            // True once this page has been connected at least once, so a later
+            // drop says "Reconnecting" rather than "Joining".
+            hasConnected: false,
+            // Why we ended up on the 'disconnected' screen: 'unreachable',
+            // 'no-host', 'full', 'token', or 'other' (with failDetail).
+            failReason: null,
+            failDetail: '',
             // InApp Remote mode (embedded in Tauri host app)
             isInAppRemote: new URLSearchParams(window.location.search).get('mode') === 'inapp',
             // Join token from the QR URL (?t=...). The signaling server verifies
@@ -1232,6 +1449,7 @@
             chevronsUp: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>',
             chevronsDown: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>',
             trash: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+            mic: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
             music: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>',
             refreshCw: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>',
             list: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>',
@@ -1261,7 +1479,20 @@
             }
 
             if (state.screen === 'loading') {
-                app.innerHTML = renderLoadingScreen();
+                // Update the text in place if the connecting screen is already
+                // up, so the animation keeps running smoothly between steps
+                // and retries instead of restarting on every render.
+                const existing = app.querySelector('.connecting-screen');
+                if (existing) {
+                    const copy = connectingCopy();
+                    existing.querySelector('.connect-title').textContent = copy.title;
+                    existing.querySelector('.connect-status').textContent = copy.status;
+                    const hint = existing.querySelector('.connect-hint');
+                    hint.textContent = copy.hint;
+                    hint.hidden = !copy.hint;
+                } else {
+                    app.innerHTML = renderLoadingScreen();
+                }
                 return;
             }
 
@@ -1297,27 +1528,99 @@
             `;
         }
 
+        function connectingCopy() {
+            const name = state.username.trim();
+            const title = state.hasConnected ? 'Reconnecting' : 'Joining the room';
+            let status;
+            if (state.reconnecting) {
+                status = 'Still trying to reach the host…';
+            } else if (state.connectStage === 'host') {
+                status = 'Tuning in to the host…';
+            } else if (state.connectStage === 'room') {
+                status = name ? `Getting you in as ${name}…` : 'Getting you in…';
+            } else {
+                status = 'Finding the host…';
+            }
+            // Only reassure once it's actually taking a while — the first
+            // attempt usually finishes before anyone would read this.
+            const hint = state.reconnectAttempts >= 2
+                ? 'Make sure your phone is on the same Wi‑Fi as the karaoke host.'
+                : '';
+            return { title, status, hint };
+        }
+
         function renderLoadingScreen() {
+            const copy = connectingCopy();
             return `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>${state.reconnecting ? `Reconnecting... (attempt ${state.reconnectAttempts})` : 'Connecting to host...'}</p>
+                <div class="connecting-screen" role="status" aria-live="polite">
+                    <div class="connect-visual" aria-hidden="true">
+                        <span class="connect-ring"></span>
+                        <span class="connect-ring"></span>
+                        <span class="connect-ring"></span>
+                        <span class="connect-note n1">♪</span>
+                        <span class="connect-note n2">♫</span>
+                        <span class="connect-note n3">♪</span>
+                        <div class="connect-mic">${icons.mic}</div>
+                    </div>
+                    <div class="connect-eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                    <h2 class="connect-title">${copy.title}</h2>
+                    <p class="connect-status">${escapeHtml(copy.status)}</p>
+                    <p class="connect-hint" ${copy.hint ? '' : 'hidden'}>${copy.hint}</p>
                 </div>
             `;
         }
 
+        function failureCopy() {
+            switch (state.failReason) {
+                case 'token':
+                    return {
+                        title: 'This invite has expired',
+                        body: 'The host app was restarted or the QR code changed. Scan the QR code on the host screen again to join.',
+                        canRetry: false
+                    };
+                case 'full':
+                    return {
+                        title: 'The room is full',
+                        body: 'The host has reached the maximum number of guests. Try again once someone leaves.',
+                        canRetry: true
+                    };
+                case 'no-host':
+                    return {
+                        title: 'Host isn’t ready',
+                        body: 'The karaoke host isn’t running a room right now. Ask them to open the app, then try again.',
+                        canRetry: true
+                    };
+                case 'other':
+                    return {
+                        title: 'Couldn’t join the room',
+                        body: state.failDetail || 'The host turned down the request to join.',
+                        canRetry: true
+                    };
+                default:
+                    return {
+                        title: state.hasConnected ? 'Connection lost' : 'Couldn’t reach the host',
+                        body: 'Check that your phone is on the same Wi‑Fi as the karaoke host, then try again.',
+                        canRetry: true
+                    };
+            }
+        }
+
         function renderDisconnectedScreen() {
+            const copy = failureCopy();
             return `
-                <div class="disconnected-screen">
+                <div class="disconnected-screen" role="alert">
                     <div style="color: var(--text-secondary); margin-bottom: 16px;">
                         ${icons.music}
                     </div>
-                    <h2 style="margin-bottom: 8px;">Connection Lost</h2>
-                    <p style="color: var(--text-secondary);">Could not connect to the host after ${state.maxReconnectAttempts} attempts.</p>
-                    <button class="retry-btn" onclick="reconnect()">
-                        ${icons.refreshCw}
-                        <span style="margin-left: 8px;">Retry</span>
-                    </button>
+                    <h2 style="margin-bottom: 8px;">${copy.title}</h2>
+                    <p style="color: var(--text-secondary); max-width: 300px; line-height: 1.5;">${escapeHtml(copy.body)}</p>
+                    ${copy.canRetry ? `
+                        <button class="retry-btn" onclick="reconnect()">
+                            ${icons.refreshCw}
+                            <span>Try again</span>
+                        </button>
+                    ` : ''}
+                    <button class="link-btn" onclick="backToJoin()">Change name</button>
                 </div>
             `;
         }
@@ -1782,9 +2085,7 @@
             if (name) {
                 state.username = name;
                 localStorage.setItem('karaoke_username', name);
-                state.screen = 'loading';
-                render();
-                initConnection();
+                reconnect();
             }
         }
 
@@ -2078,7 +2379,36 @@
             cleanup();
             state.reconnectAttempts = 0;
             state.reconnecting = false;
+            state.failReason = null;
+            state.failDetail = '';
             startConnection();
+        }
+
+        /**
+         * Leave the connecting/failed screens and go back to the name form.
+         */
+        function backToJoin() {
+            connectionAttemptId++;   // make any in-flight callbacks stale
+            cleanup();
+            state.reconnectAttempts = 0;
+            state.reconnecting = false;
+            state.failReason = null;
+            state.failDetail = '';
+            state.screen = 'join';
+            render();
+        }
+
+        /**
+         * Give up retrying and show the failure screen with a reason.
+         */
+        function failConnection(reason, detail) {
+            connectionAttemptId++;   // make any in-flight callbacks stale
+            cleanup();
+            state.failReason = reason;
+            state.failDetail = detail || '';
+            state.reconnecting = false;
+            state.screen = 'disconnected';
+            render();
         }
 
         /**
@@ -2095,9 +2425,8 @@
             cleanup();
 
             if (state.reconnectAttempts >= state.maxReconnectAttempts) {
-                state.screen = 'disconnected';
-                state.reconnecting = false;
-                render();
+                // Keep a more specific reason (e.g. 'no-host') if one was seen.
+                failConnection(state.failReason || 'unreachable', state.failDetail);
                 return;
             }
 
@@ -2135,6 +2464,7 @@
             const signalingUrl = window.location.origin;
             console.log('[Remote] Connecting to:', signalingUrl, '(attempt id:', attemptId, ')');
 
+            state.connectStage = 'server';
             state.screen = 'loading';
             render();
 
@@ -2147,6 +2477,8 @@
             socket.on('connect', () => {
                 if (isStale()) return;
                 console.log('[Remote] Socket connected');
+                state.connectStage = 'room';
+                render();
                 socket.emit('JOIN_ROOM', {
                     roomId: 'default',
                     joinToken: state.joinToken,
@@ -2157,16 +2489,29 @@
             socket.on('JOIN_SUCCESS', (data) => {
                 if (isStale()) return;
                 console.log('[Remote] Joined room:', data);
+                state.connectStage = 'host';
+                render();
                 initPeer(data.hostPeerId, attemptId);
             });
 
             socket.on('JOIN_REJECTED', (data) => {
                 if (isStale()) return;
                 console.error('[Remote] Rejected:', data);
-                isConnecting = false;
-                state.screen = 'disconnected';
-                state.reconnecting = false;
-                render();
+                // Reasons come from verify_room() / the JOIN_ROOM handler in
+                // src-tauri/src/signaling.rs.
+                const reason = (data && data.reason) || '';
+                if (reason === 'No active host found') {
+                    // Often transient (host app still starting) — keep
+                    // retrying quietly, and explain it if we run out.
+                    state.failReason = 'no-host';
+                    scheduleReconnect();
+                } else if (reason === 'Invalid token') {
+                    failConnection('token');
+                } else if (reason === 'Room is full') {
+                    failConnection('full');
+                } else {
+                    failConnection('other', reason);
+                }
             });
 
             socket.on('HOST_DISCONNECTED', () => {
@@ -2209,8 +2554,10 @@
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 console.log('[Remote] App foregrounded');
-                // If disconnected or stuck, retry
-                if (state.screen !== 'connected' && !isConnecting) {
+                // If disconnected or stuck, retry — but never before the guest
+                // has pressed Join (coming back from the QR scanner fires this).
+                // An expired invite won't fix itself by retrying, so leave that screen alone.
+                if (state.screen !== 'connected' && state.screen !== 'join' && state.failReason !== 'token' && !isConnecting) {
                     console.log('[Remote] Triggering foreground reconnect');
                     reconnect();
                 }
@@ -2219,7 +2566,7 @@
 
         window.addEventListener('online', () => {
             console.log('[Remote] Network online');
-            if (state.screen !== 'connected') {
+            if (state.screen !== 'connected' && state.screen !== 'join' && state.failReason !== 'token') {
                 reconnect();
             }
         });
@@ -2257,6 +2604,9 @@
                     if (isStale()) return;
                     const wasReconnecting = state.reconnectAttempts > 0;
                     console.log('[Remote] Connected to host!');
+                    state.hasConnected = true;
+                    state.failReason = null;
+                    state.failDetail = '';
                     state.screen = 'connected';
                     state.reconnectAttempts = 0;
                     state.reconnecting = false;
