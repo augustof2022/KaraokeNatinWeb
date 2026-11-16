@@ -63,6 +63,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      contents: write   # tag and release notes for the deployed version
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -71,3 +72,24 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Record which commit each website version came from, with its notes
+      # from web/CHANGELOG.md, on the repository's Releases page. Tags are
+      # web-v<version> so they never collide with the desktop app's v* tags.
+      - uses: actions/checkout@v4
+      - name: Tag this version and publish its release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' web/js/app.js)
+          tag="web-v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag is already released; this deploy did not change the version."
+            exit 0
+          fi
+          awk -v v="$version" 'index($0, "## [" v "]") == 1 {on=1; next} on && /^## \[/ {exit} on' \
+            web/CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          echo "" >> "$RUNNER_TEMP/notes.md"
+          echo "Live at ${{ steps.deployment.outputs.page_url }}" >> "$RUNNER_TEMP/notes.md"
+          gh release create "$tag" --target "$GITHUB_SHA" --title "Website $version" \
+            --notes-file "$RUNNER_TEMP/notes.md"

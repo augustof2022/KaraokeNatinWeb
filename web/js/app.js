@@ -1385,6 +1385,7 @@
     app.joinPhase = "broker";
     app.joinDetail = "";
     app.joinFailure = "";
+    app.joinFailCount = 0;
     app.state = R.createState(code);
     app.name = app.name || loadName() || "";
 
@@ -1396,7 +1397,8 @@
         if (app.role !== "guest" || (app.net !== net && app.state !== room)) return;
         app.connection = s;
         app.joinDetail = detail || "";
-        if (s === "retrying") app.joinFailure = detail || "";
+        if (s === "retrying") { app.joinFailure = detail || ""; app.joinFailCount = (app.joinFailCount || 0) + 1; }
+        if (s === "connected") app.joinFailCount = 0;
         if (s !== "connected") app.guestSynced = false;
         renderConnection(detail);
       },
@@ -1992,6 +1994,23 @@
 
   var focusBeforeReconnect = null;
   var guestSyncTimer = null;
+  /* The overlay offers "Retry now" only once the join is clearly stuck. The connection retries on its own, so showing a Retry
+   * button the instant a guest presses Join reads as "it already failed".
+   * Stuck = offline, a few failed attempts in a row, or no luck for a while. */
+  var RECONNECT_ACTIONS_AFTER_MS = 15000;
+  var RECONNECT_ACTIONS_AFTER_FAILURES = 3;
+  var reconnectShownAt = 0;
+  var reconnectActionsTimer = null;
+  function reconnectNeedsAction() {
+    return navigator.onLine === false ||
+      (app.joinFailCount || 0) >= RECONNECT_ACTIONS_AFTER_FAILURES ||
+      (reconnectShownAt > 0 && Date.now() - reconnectShownAt >= RECONNECT_ACTIONS_AFTER_MS);
+  }
+  function focusReconnect() {
+    var retry = $("#guest-retry");
+    if (retry && retry.getClientRects().length) retry.focus();
+    else $("#guest-reconnect .modal").focus();
+  }
   function cancelPendingSearch() {
     if (!app.searchBusy && !app.searchSweep) return;
     if (app.searchSweep) app.searchSweep.cancel();
@@ -2032,6 +2051,21 @@
       help.textContent = failures[app.joinFailure] || "";
       help.hidden = !help.textContent || app.connection === "retrying";
     }
+    if (blocked && overlay.hidden) {
+      reconnectShownAt = Date.now();
+      clearTimeout(reconnectActionsTimer);
+      reconnectActionsTimer = setTimeout(updateGuestReconnect, RECONNECT_ACTIONS_AFTER_MS + 50);
+    }
+    if (blocked) {
+      var retryButton = $("#guest-retry");
+      var showRetry = reconnectNeedsAction();
+      var revealing = retryButton.hidden && showRetry;
+      retryButton.hidden = !showRetry;
+      $("#guest-reconnect .modal").classList.toggle("is-offline", navigator.onLine === false);
+      // Move focus onto Retry when it appears, but only if focus was on the
+      // dialog itself — never yank it from somewhere the guest put it.
+      if (revealing && !overlay.hidden && document.activeElement === $("#guest-reconnect .modal")) $("#guest-retry").focus();
+    }
     // Re-request the snapshot if an open channel has not finished the join.
     // These are handshake messages, never queued room actions.
     if (blocked && navigator.onLine !== false && app.net && app.net.isOpen && app.net.isOpen()) {
@@ -2046,11 +2080,15 @@
       focusBeforeReconnect = document.activeElement;
       room.setAttribute("inert", "");
       overlay.hidden = false;
-      $("#guest-retry").focus();
+      focusReconnect();
       room.setAttribute("aria-hidden", "true");
     } else if (!blocked && !overlay.hidden) {
       var restore = overlay.contains(document.activeElement);
       overlay.hidden = true;
+      reconnectShownAt = 0;
+      clearTimeout(reconnectActionsTimer);
+      reconnectActionsTimer = null;
+      $("#guest-retry").hidden = true;
       room.removeAttribute("inert");
       room.removeAttribute("aria-hidden");
       if (restore && app.role === "guest") {
@@ -3550,7 +3588,7 @@
 
   /* Also the ?v= on every asset in index.html and in sw.js SHELL_FILES.
    * tools/version-check.js fails the build if the three drift apart. */
-  var APP_VERSION = "2.6.10";
+  var APP_VERSION = "2.6.11";
   var UPDATE_CHECK_MS = 30 * 60 * 1000;
 
   var swReg = null;
@@ -3930,12 +3968,18 @@
     $("#guest-reconnect").addEventListener("keydown", function (e) {
       if (e.key !== "Tab") return;
       var retry = $("#guest-retry"), leaveButton = $("#guest-leave");
+      // Before Retry appears, Leave is the only control: keep focus inside.
+      if (retry.hidden) {
+        e.preventDefault();
+        (document.activeElement === leaveButton ? $("#guest-reconnect .modal") : leaveButton).focus();
+        return;
+      }
       if (e.shiftKey && document.activeElement === retry) { e.preventDefault(); leaveButton.focus(); }
       else if (!e.shiftKey && document.activeElement === leaveButton) { e.preventDefault(); retry.focus(); }
     });
     document.addEventListener("focusin", function (e) {
       var overlay = $("#guest-reconnect");
-      if (!overlay.hidden && !overlay.contains(e.target)) $("#guest-retry").focus();
+      if (!overlay.hidden && !overlay.contains(e.target)) focusReconnect();
     });
     global.addEventListener("offline", function () {
       if (app.role === "guest") { app.guestSynced = false; renderConnection(); }

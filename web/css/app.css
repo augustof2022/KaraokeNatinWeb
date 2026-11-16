@@ -2508,6 +2508,95 @@ body.in-lobby .panels { opacity: 0.35; pointer-events: none; }
 /* Reconnection blocks guest room controls until a fresh host snapshot arrives. */
 .reconnect-backdrop { z-index: 100; }
 
+/* While the guest is still joining: a mic with ripples, floating notes and a
+   small equaliser, instead of buttons that ask the guest to do something. */
+.reconnect-modal { text-align: center; }
+#guest-retry[hidden] { display: none; }
+.reconnect-modal .leave-room-actions { justify-content: center; }
+.connect-visual {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.connect-ring {
+  position: absolute;
+  inset: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: connect-ripple 2.4s var(--ease) infinite;
+}
+.connect-ring:nth-child(2) { animation-delay: 1.2s; }
+@keyframes connect-ripple {
+  from { transform: scale(0.9); opacity: 0.5; }
+  to   { transform: scale(1.65); opacity: 0; }
+}
+.connect-mic {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 28px -8px rgba(var(--accent-rgb), 0.6);
+  animation: connect-bob 1.6s ease-in-out infinite;
+}
+@keyframes connect-bob {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50%      { transform: translateY(-5px) rotate(4deg); }
+}
+.connect-note {
+  position: absolute;
+  bottom: 34px;
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  animation: connect-float 3s ease-out infinite;
+}
+.connect-note.n1 { left: 12px; }
+.connect-note.n2 { right: 10px; font-size: 17px; animation-delay: 1s; }
+.connect-note.n3 { left: 50%; font-size: 15px; animation-delay: 2s; }
+@keyframes connect-float {
+  0%   { transform: translateY(0) scale(0.7); opacity: 0; }
+  20%  { opacity: 0.9; }
+  100% { transform: translateY(-80px) scale(1.1); opacity: 0; }
+}
+.connect-eq {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 4px;
+  height: 18px;
+  margin-bottom: 14px;
+}
+.connect-eq span {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: scaleY(0.5);
+  transform-origin: bottom;
+  animation: connect-eq 1s ease-in-out infinite;
+}
+.connect-eq span:nth-child(2) { animation-delay: -0.8s; }
+.connect-eq span:nth-child(3) { animation-delay: -0.4s; }
+.connect-eq span:nth-child(4) { animation-delay: -0.6s; }
+.connect-eq span:nth-child(5) { animation-delay: -0.2s; }
+@keyframes connect-eq {
+  0%, 100% { transform: scaleY(0.25); }
+  50%      { transform: scaleY(1); }
+}
+.reconnect-modal.is-offline .connect-visual,
+.reconnect-modal.is-offline .connect-eq { display: none; }
+
 /* Stack the QR and join requests without covering each other or the bottom bar. */
 .fs-sidebar { display: none; }
 body.stage-fullscreen .fs-sidebar {

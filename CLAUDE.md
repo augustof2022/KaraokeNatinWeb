@@ -2,6 +2,13 @@
 
 **Read `REPOMAPPING.md` before making changes.** It covers how this repo actually works, which code paths are live versus dead, and the traps that reliably mislead readers. The rest of this file is the short version.
 
+## Two apps live here — check which one the user means
+
+- **The desktop app** (Tauri + Rust, `apps/host/`, version in `apps/host/src-tauri/tauri.conf.json`). Everything else in this file and in REPOMAPPING.md is about it. Its guest page is `apps/host/src-tauri/remote-ui/index.html`.
+- **The browser app** in `web/` (plain JS, no build step), published to GitHub Pages at `augustof2022.github.io/KaraokeNatinWeb`, version shown in its footer. It has its own guest join flow (`web/js/app.js`, `web/js/peer.js`), its own Playwright tests (`web/tools`, `npm test`) and its own changelog (`web/CHANGELOG.md`). **Every change to its shipped files needs `node tools/bump-version.js patch|minor|major` and a changelog entry**; CI enforces this. See "Versioning" in `web/README.md`.
+
+A user reporting a bug from a phone browser, or quoting a `v2.x` version, is almost certainly on the browser app.
+
 ## Non-negotiables
 
 1. **A third of the committed code is unreachable.** `apps/signaling-server/` and `apps/web-client/` are dead; signaling is Rust (`src-tauri/signaling.rs`) and guests get `src-tauri/remote-ui/index.html`. Confirm a path is live before extending it — see the table in REPOMAPPING.md.
