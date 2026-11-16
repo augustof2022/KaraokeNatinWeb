@@ -46,6 +46,34 @@ jobs:
         run: pnpm run build
         working-directory: apps/host
 
+  # The browser app in web/ (published to GitHub Pages) used to be tested only
+  # by the Pages deploy, i.e. after merging. This runs the same suite on every
+  # PR, and refuses a PR that changes the site without raising its version.
+  website:
+    name: Website (version and tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the version check diffs against the PR's base
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Require a new version for website changes
+        if: github.event_name == 'pull_request'
+        working-directory: web
+        run: node tools/version-bump-check.js "${{ github.event.pull_request.base.sha }}"
+
+      - name: Test website
+        working-directory: web/tools
+        run: |
+          for file in ../js/*.js ../sw.js; do node --check "$file"; done
+          npm ci
+          npx playwright install --with-deps chromium
+          npm test
+
   rust:
     name: Test and lint (Rust)
     runs-on: ubuntu-latest

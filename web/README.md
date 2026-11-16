@@ -23,6 +23,31 @@ On the host screen, **Leave** opens a confirmation inside the app. Choose
 and return home. This also works when the browser suppresses its own popups.
 Guests can use **Leave** to return home without closing the host’s room.
 
+## Versioning
+
+Every change to the published site gets a new version number, fixes included. The
+number is shown in the site's footer (e.g. `v2.6.11`), and [CHANGELOG.md](CHANGELOG.md)
+says what each version contains. To check whether a fix has reached a phone or TV,
+compare its footer with the changelog; **Check for updates** fetches the newest one.
+
+To release a change, from `web/`:
+
+```bash
+node tools/bump-version.js patch   # fixes: 2.6.10 → 2.6.11 (or minor / major)
+```
+
+That updates the version everywhere it lives (`js/app.js`, `sw.js`, and the `?v=` on
+every asset in `index.html`) and opens a `## [x.y.z]` section in `CHANGELOG.md` for
+you to fill in. Then:
+
+- **On the pull request**, CI's *Website (version and tests)* job fails if the site's
+  shipped files changed without a higher version and a changelog entry
+  (`tools/version-bump-check.js`), and runs the full website test suite.
+- **On merge to `main`**, the Pages workflow deploys the site, tags the commit
+  `web-v<version>` and publishes that version's changelog section as a GitHub Release.
+
+Changes only to `tools/`, docs or tests don't need a new version.
+
 ## How it connects without a backend
 
 Two browsers can talk directly over a WebRTC data channel, but they cannot *find* each other

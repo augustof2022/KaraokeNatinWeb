@@ -31,7 +31,7 @@
       } catch (e) { /* private mode — fall back to the system preference */ }
     })();
   </script>
-  <link rel="stylesheet" href="css/app.css?v=2.6.10" />
+  <link rel="stylesheet" href="css/app.css?v=2.6.11" />
 </head>
 
 <body>
@@ -228,14 +228,27 @@
   </div>
 
   <div id="guest-reconnect" class="modal-backdrop reconnect-backdrop" hidden>
-    <div class="modal modal-sm" role="alertdialog" aria-modal="true"
+    <div class="modal modal-sm reconnect-modal" role="alertdialog" aria-modal="true" tabindex="-1"
          aria-labelledby="guest-reconnect-title" aria-describedby="guest-reconnect-text">
+      <!-- Shown while we're still trying; purely decorative. -->
+      <div class="connect-visual" aria-hidden="true">
+        <span class="connect-ring"></span>
+        <span class="connect-ring"></span>
+        <span class="connect-note n1">♪</span>
+        <span class="connect-note n2">♫</span>
+        <span class="connect-note n3">♪</span>
+        <span class="connect-mic">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </span>
+      </div>
+      <div class="connect-eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
       <h2 id="guest-reconnect-title">Reconnecting to the room</h2>
       <p id="guest-reconnect-text">You’re disconnected. We’re trying to reconnect;
         room controls will return when the connection is ready.</p>
       <p id="guest-connection-help" hidden></p>
       <div class="leave-room-actions">
-        <button type="button" id="guest-retry" class="btn btn-primary">Retry now</button>
+        <!-- Hidden until the join is clearly stuck (see updateGuestReconnect). -->
+        <button type="button" id="guest-retry" class="btn btn-primary" hidden>Retry now</button>
         <button type="button" id="guest-leave" class="btn btn-ghost">Leave room</button>
       </div>
     </div>
@@ -852,19 +865,19 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script src="js/icons.js?v=2.6.10"></script>
-  <script src="js/sound.js?v=2.6.10"></script>
-  <script src="js/fx.js?v=2.6.10"></script>
-  <script src="js/stats.js?v=2.6.10"></script>
-  <script src="js/games.js?v=2.6.10"></script>
-  <script src="js/qr.js?v=2.6.10"></script>
-  <script src="js/connection-config.js?v=2.6.10"></script>
-  <script src="js/peer.js?v=2.6.10"></script>
-  <script src="js/search.js?v=2.6.10"></script>
-  <script src="js/library.js?v=2.6.10"></script>
-  <script src="js/room.js?v=2.6.10"></script>
-  <script src="js/player.js?v=2.6.10"></script>
-  <script src="js/embed.js?v=2.6.10"></script>
-  <script src="js/app.js?v=2.6.10"></script>
+  <script src="js/icons.js?v=2.6.11"></script>
+  <script src="js/sound.js?v=2.6.11"></script>
+  <script src="js/fx.js?v=2.6.11"></script>
+  <script src="js/stats.js?v=2.6.11"></script>
+  <script src="js/games.js?v=2.6.11"></script>
+  <script src="js/qr.js?v=2.6.11"></script>
+  <script src="js/connection-config.js?v=2.6.11"></script>
+  <script src="js/peer.js?v=2.6.11"></script>
+  <script src="js/search.js?v=2.6.11"></script>
+  <script src="js/library.js?v=2.6.11"></script>
+  <script src="js/room.js?v=2.6.11"></script>
+  <script src="js/player.js?v=2.6.11"></script>
+  <script src="js/embed.js?v=2.6.11"></script>
+  <script src="js/app.js?v=2.6.11"></script>
 </body>
 </html>

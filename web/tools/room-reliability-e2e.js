@@ -208,6 +208,13 @@ async function main() {
     assert.equal(await guest.locator("#view-room").getAttribute("inert"), "");
     await guest.evaluate(() => document.getElementById("play-btn").click());
     assert.equal(await guest.evaluate(() => window.__guest.sent.length), 0, "offline action is not sent");
+    // Still joining normally: the guest is shown progress, not a Retry button.
+    assert.equal(await guest.locator("#guest-retry").isVisible(), false, "a join in progress does not ask the guest to retry");
+    assert.equal(await guest.locator("#guest-leave").isVisible(), true, "the guest can always back out of a join");
+    await guest.evaluate(() => { window.__guest.handlers.state("retrying", "host-unreachable"); window.__guest.handlers.state("retrying", "host-unreachable"); });
+    assert.equal(await guest.locator("#guest-retry").isVisible(), false, "a couple of automatic retries are not a failure yet");
+    await guest.evaluate(() => window.__guest.handlers.state("retrying", "host-unreachable"));
+    await guest.locator("#guest-retry").waitFor({ state: "visible" });
     await guest.locator("#guest-retry").click();
     assert.equal(await guest.evaluate(() => window.__guest.retries), 1);
     await guest.evaluate(() => { window.__guest.open = true; window.__guest.handlers.state("connected"); });
